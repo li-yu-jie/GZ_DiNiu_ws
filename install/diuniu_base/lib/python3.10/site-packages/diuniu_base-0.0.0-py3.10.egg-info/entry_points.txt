@@ -1,0 +1,3 @@
+[console_scripts]
+diuniu_base = diuniu_base.diuniu_base_node:main
+

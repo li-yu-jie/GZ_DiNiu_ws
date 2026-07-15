@@ -1,0 +1,30 @@
+[0.870s] Invoking command in '/home/y/GZ_DiNiu_ws/src/betop_teleop': PYTHONPATH=/home/y/GZ_DiNiu_ws/build/betop_teleop/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/betop_teleop build --build-base /home/y/GZ_DiNiu_ws/build/betop_teleop/build install --record /home/y/GZ_DiNiu_ws/build/betop_teleop/install.log --install-scripts $base/lib/betop_teleop --single-version-externally-managed install_data
+[1.201s] running egg_info
+[1.202s] writing ../../build/betop_teleop/betop_teleop.egg-info/PKG-INFO
+[1.202s] writing dependency_links to ../../build/betop_teleop/betop_teleop.egg-info/dependency_links.txt
+[1.205s] writing entry points to ../../build/betop_teleop/betop_teleop.egg-info/entry_points.txt
+[1.205s] writing requirements to ../../build/betop_teleop/betop_teleop.egg-info/requires.txt
+[1.205s] writing top-level names to ../../build/betop_teleop/betop_teleop.egg-info/top_level.txt
+[1.206s] reading manifest file '../../build/betop_teleop/betop_teleop.egg-info/SOURCES.txt'
+[1.207s] writing manifest file '../../build/betop_teleop/betop_teleop.egg-info/SOURCES.txt'
+[1.207s] running build
+[1.207s] running build_py
+[1.207s] copying betop_teleop/diuniu_teleop_serial.py -> /home/y/GZ_DiNiu_ws/build/betop_teleop/build/lib/betop_teleop
+[1.207s] copying betop_teleop/diuniu_teleop_cmd_vel.py -> /home/y/GZ_DiNiu_ws/build/betop_teleop/build/lib/betop_teleop
+[1.207s] running install
+[1.208s] running install_lib
+[1.211s] copying /home/y/GZ_DiNiu_ws/build/betop_teleop/build/lib/betop_teleop/diuniu_teleop_serial.py -> /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop
+[1.211s] copying /home/y/GZ_DiNiu_ws/build/betop_teleop/build/lib/betop_teleop/diuniu_teleop_cmd_vel.py -> /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop
+[1.211s] byte-compiling /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop/diuniu_teleop_serial.py to diuniu_teleop_serial.cpython-310.pyc
+[1.217s] byte-compiling /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop/diuniu_teleop_cmd_vel.py to diuniu_teleop_cmd_vel.cpython-310.pyc
+[1.219s] running install_data
+[1.219s] copying launch/diuniu_teleop_serial.launch.py -> /home/y/GZ_DiNiu_ws/install/betop_teleop/share/betop_teleop/launch
+[1.219s] copying launch/diuniu_teleop_cmd_vel.launch.py -> /home/y/GZ_DiNiu_ws/install/betop_teleop/share/betop_teleop/launch
+[1.219s] running install_egg_info
+[1.221s] removing '/home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop-0.0.1-py3.10.egg-info' (and everything under it)
+[1.222s] Copying ../../build/betop_teleop/betop_teleop.egg-info to /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop-0.0.1-py3.10.egg-info
+[1.223s] running install_scripts
+[1.251s] Installing diuniu_teleop_cmd_vel script to /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/betop_teleop
+[1.252s] Installing diuniu_teleop_serial script to /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/betop_teleop
+[1.252s] writing list of installed files to '/home/y/GZ_DiNiu_ws/build/betop_teleop/install.log'
+[1.306s] Invoked command in '/home/y/GZ_DiNiu_ws/src/betop_teleop' returned '0': PYTHONPATH=/home/y/GZ_DiNiu_ws/build/betop_teleop/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/betop_teleop build --build-base /home/y/GZ_DiNiu_ws/build/betop_teleop/build install --record /home/y/GZ_DiNiu_ws/build/betop_teleop/install.log --install-scripts $base/lib/betop_teleop --single-version-externally-managed install_data

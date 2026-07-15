@@ -1,0 +1,24 @@
+[0.877s] Invoking command in '/home/y/GZ_DiNiu_ws/src/diuniu_base': PYTHONPATH=/home/y/GZ_DiNiu_ws/build/diuniu_base/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/y/GZ_DiNiu_ws/install/diuniu_base/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/diuniu_base build --build-base /home/y/GZ_DiNiu_ws/build/diuniu_base/build install --record /home/y/GZ_DiNiu_ws/build/diuniu_base/install.log --install-scripts $base/lib/diuniu_base --single-version-externally-managed install_data
+[1.214s] running egg_info
+[1.215s] writing ../../build/diuniu_base/diuniu_base.egg-info/PKG-INFO
+[1.215s] writing dependency_links to ../../build/diuniu_base/diuniu_base.egg-info/dependency_links.txt
+[1.216s] writing entry points to ../../build/diuniu_base/diuniu_base.egg-info/entry_points.txt
+[1.216s] writing requirements to ../../build/diuniu_base/diuniu_base.egg-info/requires.txt
+[1.216s] writing top-level names to ../../build/diuniu_base/diuniu_base.egg-info/top_level.txt
+[1.218s] reading manifest file '../../build/diuniu_base/diuniu_base.egg-info/SOURCES.txt'
+[1.221s] writing manifest file '../../build/diuniu_base/diuniu_base.egg-info/SOURCES.txt'
+[1.222s] running build
+[1.222s] running build_py
+[1.222s] copying diuniu_base/diuniu_base_node.py -> /home/y/GZ_DiNiu_ws/build/diuniu_base/build/lib/diuniu_base
+[1.222s] running install
+[1.223s] running install_lib
+[1.223s] copying /home/y/GZ_DiNiu_ws/build/diuniu_base/build/lib/diuniu_base/diuniu_base_node.py -> /home/y/GZ_DiNiu_ws/install/diuniu_base/lib/python3.10/site-packages/diuniu_base
+[1.224s] byte-compiling /home/y/GZ_DiNiu_ws/install/diuniu_base/lib/python3.10/site-packages/diuniu_base/diuniu_base_node.py to diuniu_base_node.cpython-310.pyc
+[1.227s] running install_data
+[1.227s] running install_egg_info
+[1.232s] removing '/home/y/GZ_DiNiu_ws/install/diuniu_base/lib/python3.10/site-packages/diuniu_base-0.0.0-py3.10.egg-info' (and everything under it)
+[1.233s] Copying ../../build/diuniu_base/diuniu_base.egg-info to /home/y/GZ_DiNiu_ws/install/diuniu_base/lib/python3.10/site-packages/diuniu_base-0.0.0-py3.10.egg-info
+[1.233s] running install_scripts
+[1.260s] Installing diuniu_base script to /home/y/GZ_DiNiu_ws/install/diuniu_base/lib/diuniu_base
+[1.261s] writing list of installed files to '/home/y/GZ_DiNiu_ws/build/diuniu_base/install.log'
+[1.308s] Invoked command in '/home/y/GZ_DiNiu_ws/src/diuniu_base' returned '0': PYTHONPATH=/home/y/GZ_DiNiu_ws/build/diuniu_base/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/y/GZ_DiNiu_ws/install/diuniu_base/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/diuniu_base build --build-base /home/y/GZ_DiNiu_ws/build/diuniu_base/build install --record /home/y/GZ_DiNiu_ws/build/diuniu_base/install.log --install-scripts $base/lib/diuniu_base --single-version-externally-managed install_data

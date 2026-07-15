@@ -1,0 +1,22 @@
+[2.022s] Invoking command in '/home/y/GZ_DiNiu_ws/src/betop_teleop': PYTHONPATH=/home/y/GZ_DiNiu_ws/build/betop_teleop/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/betop_teleop build --build-base /home/y/GZ_DiNiu_ws/build/betop_teleop/build install --record /home/y/GZ_DiNiu_ws/build/betop_teleop/install.log --install-scripts $base/lib/betop_teleop --single-version-externally-managed install_data
+[2.400s] running egg_info
+[2.404s] writing ../../build/betop_teleop/betop_teleop.egg-info/PKG-INFO
+[2.404s] writing dependency_links to ../../build/betop_teleop/betop_teleop.egg-info/dependency_links.txt
+[2.404s] writing entry points to ../../build/betop_teleop/betop_teleop.egg-info/entry_points.txt
+[2.404s] writing requirements to ../../build/betop_teleop/betop_teleop.egg-info/requires.txt
+[2.404s] writing top-level names to ../../build/betop_teleop/betop_teleop.egg-info/top_level.txt
+[2.412s] reading manifest file '../../build/betop_teleop/betop_teleop.egg-info/SOURCES.txt'
+[2.417s] writing manifest file '../../build/betop_teleop/betop_teleop.egg-info/SOURCES.txt'
+[2.417s] running build
+[2.417s] running build_py
+[2.417s] running install
+[2.417s] running install_lib
+[2.421s] running install_data
+[2.421s] running install_egg_info
+[2.422s] removing '/home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop-0.0.1-py3.10.egg-info' (and everything under it)
+[2.430s] Copying ../../build/betop_teleop/betop_teleop.egg-info to /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages/betop_teleop-0.0.1-py3.10.egg-info
+[2.430s] running install_scripts
+[2.465s] Installing diuniu_teleop_cmd_vel script to /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/betop_teleop
+[2.469s] Installing diuniu_teleop_serial script to /home/y/GZ_DiNiu_ws/install/betop_teleop/lib/betop_teleop
+[2.469s] writing list of installed files to '/home/y/GZ_DiNiu_ws/build/betop_teleop/install.log'
+[2.530s] Invoked command in '/home/y/GZ_DiNiu_ws/src/betop_teleop' returned '0': PYTHONPATH=/home/y/GZ_DiNiu_ws/build/betop_teleop/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/y/GZ_DiNiu_ws/install/betop_teleop/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/betop_teleop build --build-base /home/y/GZ_DiNiu_ws/build/betop_teleop/build install --record /home/y/GZ_DiNiu_ws/build/betop_teleop/install.log --install-scripts $base/lib/betop_teleop --single-version-externally-managed install_data

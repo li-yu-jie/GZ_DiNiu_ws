@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+DiuNiu 底盘遥控系统启动文件
+============================
+同时启动以下两个节点：
+  1. joy_node       —— 读取手柄（/dev/input/js0），发布 /joy 话题
+  2. diuniu_teleop  —— 订阅 /joy，将摇杆/按键映射为串口指令控制底盘
+
+使用方法：
+  ros2 launch betop_teleop diuniu_teleop.launch.py
+
+若手柄设备号不是 js0，可在本文件中修改 joy_node 的 device_id 参数。
+若要修改按键映射或速度上限，直接修改下方 diuniu_teleop 的参数即可。
+"""
+
+from launch import LaunchDescription
+from launch_ros.actions import Node
+
+
+def generate_launch_description():
+    return LaunchDescription([
+
+        # ──────────────────────────────────────────────────────
+        # 节点 1：joy_node
+        # 功能：读取 /dev/input/js0（手柄 joystick 接口），
+        #        以固定频率发布 sensor_msgs/Joy 消息到 /joy 话题
+        # ──────────────────────────────────────────────────────
+        Node(
+            package='joy',
+            executable='joy_node',
+            name='joy_node',
+            parameters=[{
+                # 手柄设备索引（0 对应 /dev/input/js0）
+                'device_id': 0,
+                # 摇杆死区：绝对值小于该阈值的轴输出视为 0，消除中位漂移
+                'deadzone': 0.05,
+                # 自动重复发布频率（Hz）：即使手柄无操作也以该频率持续发布
+                # 用于触发 diuniu_teleop 的信号超时保护检测
+                'autorepeat_rate': 10.0,
+            }],
+            output='screen',
+        ),
+
+        # ──────────────────────────────────────────────────────
+        # 节点 2：diuniu_teleop
+        # 功能：订阅 /joy 话题，将摇杆/按键数据映射为串口 ASCII 指令，
+        #        通过 /dev/ttyUSB0 发送给 STM32 底盘控制器
+        # ──────────────────────────────────────────────────────
+        Node(
+            package='betop_teleop',
+            executable='diuniu_teleop',
+            name='diuniu_teleop',
+            parameters=[{
+                # ── 串口配置 ──────────────────────────────────
+                # STM32 连接的串口设备路径
+                'serial_port': '/dev/ttyUSB0',
+                # 串口波特率，需与 STM32 固件中 UART 初始化一致
+                'baud_rate': 460800,
+
+                # ── 速度 / 转向映射 ───────────────────────────
+                # 最大线速度（m/s）：左摇杆满偏时对应的目标速度
+                'max_linear_speed': 1.2,
+                # 最大转向脉冲数：右摇杆满偏时对应的转向步进脉冲
+                'max_steer_pulse': 310000,
+
+                # ── 轴编号（北通 BFM 模式实测）────────────────
+                # 线速度控制轴：左摇杆 Y 轴（前推为正）
+                'axis_linear': 1,
+                # 转向控制轴：右摇杆 X 轴（左推为正）
+                'axis_steer': 2,
+
+                # ── 按键编号（北通 BFM 模式实测）──────────────
+                # 使能按键：RB 键（Button 7），按住才能控制底盘
+                'enable_button': 7,
+                # 紧急停止按键：B 键（Button 1），按下立即 stop
+                'stop_button': 1,
+                # 升降上升按键：Y 键（Button 4），长按持续发送 up
+                'button_lift_up': 4,
+                # 升降下降按键：A 键（Button 0），长按持续发送 down
+                'button_lift_down': 0,
+
+                # ── 其他选项 ──────────────────────────────────
+                # 转向方向取反（若实际转向与期望相反，改为 True）
+                'steer_invert': False,
+                # 控制定时器频率（Hz），决定串口指令下发速率
+                'publish_rate': 20.0,
+            }],
+            output='screen',
+        ),
+    ])
