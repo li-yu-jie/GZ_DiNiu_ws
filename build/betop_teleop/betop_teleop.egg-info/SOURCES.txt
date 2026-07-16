@@ -1,4 +1,3 @@
-README.md
 package.xml
 setup.cfg
 setup.py
@@ -10,8 +9,16 @@ setup.py
 ../../build/betop_teleop/betop_teleop.egg-info/top_level.txt
 ../../build/betop_teleop/betop_teleop.egg-info/zip-safe
 betop_teleop/__init__.py
+betop_teleop/diuniu_joy_publisher.py
 betop_teleop/diuniu_teleop_cmd_vel.py
 betop_teleop/diuniu_teleop_serial.py
+betop_teleop.egg-info/PKG-INFO
+betop_teleop.egg-info/SOURCES.txt
+betop_teleop.egg-info/dependency_links.txt
+betop_teleop.egg-info/entry_points.txt
+betop_teleop.egg-info/requires.txt
+betop_teleop.egg-info/top_level.txt
+betop_teleop.egg-info/zip-safe
 launch/diuniu_teleop.launch.py
 launch/diuniu_teleop_cmd_vel.launch.py
 launch/diuniu_teleop_serial.launch.py

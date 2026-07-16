@@ -4,7 +4,7 @@
 DiuNiu 底盘驱动节点启动文件
 ============================
 使用方法：
-  ros2 launch betop_teleop diuniu_base.launch.py
+  ros2 launch diuniu_base diuniu_base.launch.py
 """
 
 from launch import LaunchDescription
@@ -30,6 +30,17 @@ def generate_launch_description():
             description='机器人物理轴距 (m)'
         ),
 
+        DeclareLaunchArgument(
+            'pub_odom_tf',
+            default_value='true',
+            description='Whether to publish odom TF'
+        ),
+        DeclareLaunchArgument(
+            'pub_odom_topic',
+            default_value='true',
+            description='Whether to publish odom topic'
+        ),
+
         Node(
             package='diuniu_base',
             executable='diuniu_base',
@@ -38,6 +49,8 @@ def generate_launch_description():
                 'serial_port': LaunchConfiguration('port'),
                 'baud_rate': LaunchConfiguration('baud'),
                 'wheelbase': LaunchConfiguration('wheelbase'),
+                'pub_odom_tf': LaunchConfiguration('pub_odom_tf'),
+                'pub_odom_topic': LaunchConfiguration('pub_odom_topic'),
             }],
             output='screen',
         ),

@@ -12,9 +12,10 @@ DiuNiu 🐂 机器人底盘驱动节点
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, TransformStamped
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Imu
+from tf2_ros import TransformBroadcaster
 import serial
 import struct
 import math
@@ -32,11 +33,14 @@ class DiuNiuBaseNode(Node):
         self.declare_parameter('baud_rate', 460800)
         self.declare_parameter('wheelbase', 1.30)  # 物理轴距 L = 1.30m
         self.declare_parameter('max_angular_speed', 2.5) # 最大角速度参考值
+        self.declare_parameter('pub_odom_tf', True)
+        self.declare_parameter('pub_odom_topic', True)
         
         self.port_name = self.get_parameter('serial_port').value
         self.baudrate = self.get_parameter('baud_rate').value
         self.wheelbase = self.get_parameter('wheelbase').value
         self.max_angular_speed = self.get_parameter('max_angular_speed').value
+        self.pub_odom_topic = self.get_parameter('pub_odom_topic').value
         
         # ──────────────────────────────────────────
         # 2. 串口初始化与自动重连机制
@@ -51,6 +55,11 @@ class DiuNiuBaseNode(Node):
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
         self.pub_imu = self.create_publisher(Imu, 'imu/data', 10)
         self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
+        
+        # ──────────────────────────────────────────
+        # 3.1 TF 广播器
+        # ──────────────────────────────────────────
+        self.tf_broadcaster = TransformBroadcaster(self)
         
         # ──────────────────────────────────────────
         # 4. 里程计积分状态变量
@@ -149,6 +158,7 @@ class DiuNiuBaseNode(Node):
             if alpha_deg < -95.0: alpha_deg = -95.0
         # 2. 行驶状态下，执行正常的三轮车运动学正切计算与打角限幅
         else:
+            # 三轮车运动学：alpha = atan(w * L / v)，倒车时保持正确符号
             alpha_rad = math.atan((w * self.wheelbase) / v)
             alpha_deg = math.degrees(alpha_rad)
             # 避免除以 cos(alpha) 导致的转向时速度奇异激增，直接令前轮驱动速度等于目标线速度
@@ -249,6 +259,12 @@ class DiuNiuBaseNode(Node):
         self.x += vx * math.cos(self.th) * dt
         self.y += vx * math.sin(self.th) * dt
 
+        # 调试日志：每秒打印一次从串口收到的实际速度与积分出的坐标
+        self.get_logger().info(
+            f"📊 [里程计反馈] 收到实际速度: vx={vx:.3f} m/s, wz={wz:.3f} rad/s | 积分坐标: x={self.x:.3f}, y={self.y:.3f}, th={self.th:.3f}",
+            throttle_duration_sec=1.0
+        )
+
         # 发布 ODOM 话题
         odom = Odometry()
         odom.header.stamp = current_time.to_msg()
@@ -269,7 +285,23 @@ class DiuNiuBaseNode(Node):
         # 设置速度 (Vx, Wz)
         odom.twist.twist.linear.x = vx
         odom.twist.twist.angular.z = wz
-        self.pub_odom.publish(odom)
+        if self.pub_odom_topic:
+            self.pub_odom.publish(odom)
+
+        # 发布 TF 变换 (odom -> base_link)
+        t = TransformStamped()
+        t.header.stamp = odom.header.stamp
+        t.header.frame_id = 'odom'
+        t.child_frame_id = 'base_link'
+        t.transform.translation.x = self.x
+        t.transform.translation.y = self.y
+        t.transform.translation.z = 0.0
+        t.transform.rotation.x = odom.pose.pose.orientation.x
+        t.transform.rotation.y = odom.pose.pose.orientation.y
+        t.transform.rotation.z = odom.pose.pose.orientation.z
+        t.transform.rotation.w = odom.pose.pose.orientation.w
+        if self.get_parameter('pub_odom_tf').value:
+            self.tf_broadcaster.sendTransform(t)
 
         # 2. 发布 IMU 话题 (使用 BNO085 的高频融合绝对姿态四元数)
         imu = Imu()
@@ -305,7 +337,8 @@ def main(args=None):
         pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 if __name__ == '__main__':
     main()

@@ -26,16 +26,20 @@ def generate_launch_description():
         ),
 
         # ──────────────────────────────────────────────────────
-        # 节点 1：joy_node (手柄驱动)
+        # 节点 1：diuniu_joy_publisher (自定义手柄驱动)
+        # 直接读取 /dev/input/js0，发布 sensor_msgs/Joy 到 /joy 话题
+        # 用于绕过 ros-humble-joy 的 joy_node 对北通 BTP-KP20D
+        # 报 "sequence size exceeds remaining buffer" 的解析问题。
         # ──────────────────────────────────────────────────────
         Node(
-            package='joy',
-            executable='joy_node',
-            name='joy_node',
+            package='betop_teleop',
+            executable='diuniu_joy_publisher',
+            name='diuniu_joy_publisher',
             parameters=[{
-                'device_id': 0,
-                'deadzone': 0.05,
-                'autorepeat_rate': 10.0,
+                'device': '/dev/input/js0',
+                'publish_rate': 50.0,
+                'num_axes': 8,
+                'num_buttons': 16,
             }],
             output='screen',
         ),

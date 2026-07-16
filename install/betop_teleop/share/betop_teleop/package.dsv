@@ -4,3 +4,6 @@ source;share/betop_teleop/hook/pythonpath.sh
 source;share/betop_teleop/hook/ament_prefix_path.ps1
 source;share/betop_teleop/hook/ament_prefix_path.dsv
 source;share/betop_teleop/hook/ament_prefix_path.sh
+source;../../build/betop_teleop/share/betop_teleop/hook/pythonpath_develop.ps1
+source;../../build/betop_teleop/share/betop_teleop/hook/pythonpath_develop.dsv
+source;../../build/betop_teleop/share/betop_teleop/hook/pythonpath_develop.sh

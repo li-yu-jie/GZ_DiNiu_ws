@@ -81,5 +81,5 @@
 
 ### 启动命令
 ```bash
-ros2 launch diuniu_base diuniu_base.launch.py port:=/dev/ttyACM0
+ros2 launch diuniu_base diuniu_base.launch.py port:=/dev/ttyUSB0
 ```

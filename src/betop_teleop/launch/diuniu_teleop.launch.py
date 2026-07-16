@@ -22,22 +22,21 @@ def generate_launch_description():
     return LaunchDescription([
 
         # ──────────────────────────────────────────────────────
-        # 节点 1：joy_node
-        # 功能：读取 /dev/input/js0（手柄 joystick 接口），
-        #        以固定频率发布 sensor_msgs/Joy 消息到 /joy 话题
+        # 节点 1：diuniu_joy_publisher (自定义手柄驱动)
+        # 直接读取 /dev/input/js0，发布 sensor_msgs/Joy 到 /joy 话题
+        # 用于绕过 ros-humble-joy 的 joy_node 对北通 BTP-KP20D
+        # 报 "sequence size exceeds remaining buffer" 的解析问题。
+        # 若要修改手柄设备路径，可在下方 'device' 参数中指定。
         # ──────────────────────────────────────────────────────
         Node(
-            package='joy',
-            executable='joy_node',
-            name='joy_node',
+            package='betop_teleop',
+            executable='diuniu_joy_publisher',
+            name='diuniu_joy_publisher',
             parameters=[{
-                # 手柄设备索引（0 对应 /dev/input/js0）
-                'device_id': 0,
-                # 摇杆死区：绝对值小于该阈值的轴输出视为 0，消除中位漂移
-                'deadzone': 0.05,
-                # 自动重复发布频率（Hz）：即使手柄无操作也以该频率持续发布
-                # 用于触发 diuniu_teleop 的信号超时保护检测
-                'autorepeat_rate': 10.0,
+                'device': '/dev/input/js0',
+                'publish_rate': 50.0,
+                'num_axes': 8,
+                'num_buttons': 16,
             }],
             output='screen',
         ),

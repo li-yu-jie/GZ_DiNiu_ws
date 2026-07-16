@@ -24,6 +24,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'diuniu_joy_publisher = betop_teleop.diuniu_joy_publisher:main',
             'diuniu_teleop_serial = betop_teleop.diuniu_teleop_serial:main',
             'diuniu_teleop_cmd_vel = betop_teleop.diuniu_teleop_cmd_vel:main',
         ],
