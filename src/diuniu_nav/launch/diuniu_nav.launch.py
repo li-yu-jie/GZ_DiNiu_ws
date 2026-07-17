@@ -110,18 +110,20 @@ def generate_launch_description():
         ],
         parameters=[{
             'target_frame': 'base_link',
-            'transform_tolerance': 0.01,
+            'transform_tolerance': 0.05,
             'min_height': 0.15,
             'max_height': 1.2,
             'angle_min': -3.1415926,
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,  # 0.5 degrees
             'scan_time': 0.1,
-            'range_min': 0.6,
+            'range_min': 0.15,
             'range_max': 50.0,
             'use_inf': True,
             'inf_epsilon': 1.0,
-            'use_sim_time': use_sim_time
+            'use_sim_time': use_sim_time,
+            'concurrency_level': 0,
+            'queue_size': 2
         }],
         output='screen'
     )
@@ -133,10 +135,10 @@ def generate_launch_description():
         name='laserscan_filter',
         parameters=[{
             'x_min': -0.25,
-            'x_max': 2.60,
-            'y_min': -0.40,
-            'y_max': 0.40,
-            'laser_x_offset': 1.25,
+            'x_max': 1.60,
+            'y_min': -0.35,
+            'y_max': 0.35,
+            'laser_x_offset': 0.0,
             'laser_y_offset': 0.0
         }],
         output='screen'

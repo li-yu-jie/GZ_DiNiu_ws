@@ -4,6 +4,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
 import math
 
 class LaserScanFilter(Node):
@@ -14,7 +15,7 @@ class LaserScanFilter(Node):
         self.declare_parameter('x_max', 2.60)
         self.declare_parameter('y_min', -0.40)
         self.declare_parameter('y_max', 0.40)
-        self.declare_parameter('laser_x_offset', 1.25)
+        self.declare_parameter('laser_x_offset', 0.0)
         self.declare_parameter('laser_y_offset', 0.0)
         
         self.x_min = self.get_parameter('x_min').value
@@ -24,8 +25,16 @@ class LaserScanFilter(Node):
         self.laser_x_offset = self.get_parameter('laser_x_offset').value
         self.laser_y_offset = self.get_parameter('laser_y_offset').value
         
-        self.sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, 10)
-        self.pub = self.create_publisher(LaserScan, '/scan_filtered', 10)
+        # Configure Best Effort QoS with low queue depth to prevent buffer bloat
+        qos_profile = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            durability=DurabilityPolicy.VOLATILE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=2
+        )
+        
+        self.sub = self.create_subscription(LaserScan, '/scan', self.scan_callback, qos_profile)
+        self.pub = self.create_publisher(LaserScan, '/scan_filtered', qos_profile)
         
         self.get_logger().info(f"laserscan_filter started. Filtering box in base_link: x=[{self.x_min}, {self.x_max}], y=[{self.y_min}, {self.y_max}]")
 
