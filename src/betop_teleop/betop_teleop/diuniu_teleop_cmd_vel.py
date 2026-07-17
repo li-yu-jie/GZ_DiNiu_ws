@@ -13,7 +13,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Joy
 from geometry_msgs.msg import Twist
-import time
+import threading
 
 class DiuNiuTeleopCmdVel(Node):
     def __init__(self):
@@ -31,7 +31,10 @@ class DiuNiuTeleopCmdVel(Node):
         self.declare_parameter('button_lift_up', 4)
         self.declare_parameter('button_lift_down', 0)
         self.declare_parameter('steer_invert', False)
+        self.declare_parameter('linear_invert', False)
         self.declare_parameter('publish_rate', 20.0)
+        self.declare_parameter('linear_deadband', 0.05)
+        self.declare_parameter('angular_deadband', 0.10)
 
         # ──────────────────────────────────────────
         # 读取参数
@@ -45,7 +48,10 @@ class DiuNiuTeleopCmdVel(Node):
         self.button_lift_up = self.get_parameter('button_lift_up').value
         self.button_lift_down = self.get_parameter('button_lift_down').value
         self.steer_invert = self.get_parameter('steer_invert').value
+        self.linear_invert = self.get_parameter('linear_invert').value
         self.rate = self.get_parameter('publish_rate').value
+        self.linear_deadband = self.get_parameter('linear_deadband').value
+        self.angular_deadband = self.get_parameter('angular_deadband').value
 
         self.get_logger().info("🚀 [话题控制手柄节点] 正在启动，发布至 /cmd_vel 话题...")
         self.get_logger().info(f"配置参数: 最大线速={self.max_speed} m/s, 最大角速度={self.max_angular} rad/s")
@@ -54,7 +60,8 @@ class DiuNiuTeleopCmdVel(Node):
         # 状态与发布者
         # ──────────────────────────────────────────
         self.latest_joy_msg = None
-        self.last_joy_time = 0.0
+        self.last_joy_time = self.get_clock().now()
+        self._joy_lock = threading.Lock()
         
         # 创建 Twist 话题发布者
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
@@ -67,21 +74,33 @@ class DiuNiuTeleopCmdVel(Node):
         self.timer = self.create_timer(timer_period, self.control_timer_callback)
 
     def joy_callback(self, msg):
-        self.latest_joy_msg = msg
-        self.last_joy_time = time.time()
+        with self._joy_lock:
+            self.latest_joy_msg = msg
+            self.last_joy_time = self.get_clock().now()
 
     def control_timer_callback(self):
-        now = time.time()
+        now = self.get_clock().now()
 
         # ── 保护 1：信号超时 ──────────────────────────
-        if self.latest_joy_msg is None or (now - self.last_joy_time > 0.5):
-            self.get_logger().warn("手柄信号丢失或未连接，发送紧急停止话题！", throttle_duration_sec=3.0)
+        with self._joy_lock:
+            latest = self.latest_joy_msg
+            last_time = self.last_joy_time
+
+        if latest is None:
+            self.get_logger().info("等待手柄连接...", throttle_duration_sec=5.0)
+            return
+
+        if ((now - last_time).nanoseconds / 1e9 > 0.5):
+            self.get_logger().warn("手柄信号丢失，发送安全停止话题！", throttle_duration_sec=3.0)
             twist = Twist()
-            twist.angular.x = 1.0  # 急停标志
+            twist.linear.x = 0.0
+            twist.angular.z = 0.0
+            twist.linear.z = 0.0
+            twist.angular.x = 0.0  # 安全停止，非急停
             self.cmd_vel_pub.publish(twist)
             return
 
-        msg = self.latest_joy_msg
+        msg = latest
 
         # ── 保护 2：急停按键（B 键）────────────────────
         is_stop_pressed = (len(msg.buttons) > self.stop_button
@@ -103,13 +122,14 @@ class DiuNiuTeleopCmdVel(Node):
             joy_steer  = msg.axes[self.axis_steer]  if len(msg.axes) > self.axis_steer  else 0.0
 
             # 映射控制量
-            target_speed = joy_linear * self.max_speed
+            linear_sign = -1.0 if self.linear_invert else 1.0
+            target_speed = joy_linear * self.max_speed * linear_sign
             steer_sign = -1.0 if self.steer_invert else 1.0
             target_w = joy_steer * self.max_angular * steer_sign
 
-            if abs(target_speed) < 0.05:
+            if abs(target_speed) < self.linear_deadband:
                 target_speed = 0.0
-            if abs(target_w) < 0.10:
+            if abs(target_w) < self.angular_deadband:
                 target_w = 0.0
 
             # 升降动作 (1.0 代表上，-1.0 代表下，0.0 代表停)
@@ -148,7 +168,7 @@ class DiuNiuTeleopCmdVel(Node):
             twist.linear.x = 0.0
             twist.angular.z = 0.0
             twist.linear.z = 0.0
-            twist.angular.x = 1.0  # 发送急停标志
+            twist.angular.x = 0.0  # 关闭时发送安全停止，非急停
             self.cmd_vel_pub.publish(twist)
         except Exception:
             pass

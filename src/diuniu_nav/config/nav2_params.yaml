@@ -155,13 +155,13 @@ local_costmap:
       resolution: 0.05
       robot_radius: 0.95  # 后备防撞圆半径
       footprint: "[[1.60, 0.35], [1.60, -0.35], [-0.25, -0.35], [-0.25, 0.35]]"
-      plugins: ["inflation_layer"]
+      plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         observation_sources: scan
         scan:
-          topic: /scan
+          topic: /scan_filtered
           max_obstacle_height: 2.0
           clearing: true
           marking: true
@@ -186,7 +186,7 @@ global_costmap:
       use_sim_time: false
       robot_radius: 0.95
       footprint: "[[1.60, 0.35], [1.60, -0.35], [-0.25, -0.35], [-0.25, 0.35]]"
-      plugins: ["static_layer", "inflation_layer"]
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true
@@ -195,7 +195,7 @@ global_costmap:
         enabled: true
         observation_sources: scan
         scan:
-          topic: /scan
+          topic: /scan_filtered
           max_obstacle_height: 2.0
           clearing: true
           marking: true
@@ -231,7 +231,7 @@ behavior_server:
     costmap_topic: local_costmap/costmap_raw
     footprint_topic: local_costmap/published_footprint
     cycle_frequency: 10.0
-    behavior_plugins: ["backup", "wait"]
+    behavior_plugins: ["spin", "backup", "wait"]
     spin:
       plugin: "nav2_behaviors/Spin"
     backup:

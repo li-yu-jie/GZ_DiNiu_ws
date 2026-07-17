@@ -126,6 +126,22 @@ def generate_launch_description():
         output='screen'
     )
 
+    # LaserScan filter node to filter out self-occlusions (forks, body structures)
+    laserscan_filter = Node(
+        package='diuniu_base',
+        executable='laserscan_filter',
+        name='laserscan_filter',
+        parameters=[{
+            'x_min': -0.25,
+            'x_max': 2.60,
+            'y_min': -0.40,
+            'y_max': 0.40,
+            'laser_x_offset': 1.25,
+            'laser_y_offset': 0.0
+        }],
+        output='screen'
+    )
+
     return LaunchDescription([
         declare_map,
         declare_params,
@@ -134,5 +150,6 @@ def generate_launch_description():
         robot_state_publisher_node,
         bringup_with_amcl,
         bringup_without_amcl,
-        pointcloud_to_laserscan
+        pointcloud_to_laserscan,
+        laserscan_filter
     ])

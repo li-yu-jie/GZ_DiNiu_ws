@@ -15,6 +15,7 @@ import struct
 import os
 import select
 import threading
+import time
 
 
 class DiuNiuJoyPublisher(Node):
@@ -47,6 +48,7 @@ class DiuNiuJoyPublisher(Node):
         self.axes = [0.0] * self.num_axes
         self.buttons = [0] * self.num_buttons
         self._lock = threading.Lock()
+        self._fd_lock = threading.Lock()
 
         self._fd = None
         self._running = True
@@ -60,13 +62,21 @@ class DiuNiuJoyPublisher(Node):
 
     def _open_device(self):
         """尝试打开并监听指定的 joystick 设备。"""
-        try:
-            self._fd = os.open(self.device, os.O_RDONLY | os.O_NONBLOCK)
+        with self._fd_lock:
+            if self._fd is not None:
+                return
+            try:
+                self._fd = os.open(self.device, os.O_RDONLY | os.O_NONBLOCK)
+            except OSError as e:
+                self._fd = None
+                self.get_logger().error(f'无法打开手柄设备 {self.device}: {e}')
+                return
+
+        # 避免重复启动多个读取线程
+        if self._ev_thread is None or not self._ev_thread.is_alive():
             self._ev_thread = threading.Thread(target=self._read_events, daemon=True)
             self._ev_thread.start()
-            self.get_logger().info(f'成功打开手柄设备: {self.device}')
-        except OSError as e:
-            self.get_logger().error(f'无法打开手柄设备 {self.device}: {e}')
+        self.get_logger().info(f'成功打开手柄设备: {self.device}')
 
     def _read_events(self):
         """后台线程：读取 Linux joystick 事件并更新轴/按键状态。"""
@@ -74,9 +84,11 @@ class DiuNiuJoyPublisher(Node):
         while self._running and rclpy.ok():
             try:
                 if self._fd is None:
+                    if not self._running:
+                        break
                     self._open_device()
                     if self._fd is None:
-                        threading.Event().wait(1.0)
+                        time.sleep(1.0)
                         continue
 
                 r, _, _ = select.select([self._fd], [], [], 0.1)
@@ -85,6 +97,17 @@ class DiuNiuJoyPublisher(Node):
 
                 data = os.read(self._fd, JS_EVENT_SIZE)
                 if len(data) < JS_EVENT_SIZE:
+                    # 读到 EOF 说明设备已断开
+                    if len(data) == 0:
+                        with self._fd_lock:
+                            fd = self._fd
+                            self._fd = None
+                        if fd is not None:
+                            try:
+                                os.close(fd)
+                            except Exception:
+                                pass
+                        self.get_logger().warn('手柄设备断开，尝试重连...')
                     continue
 
                 # struct js_event: time(u32), value(s16), type(u8), number(u8)
@@ -104,7 +127,14 @@ class DiuNiuJoyPublisher(Node):
 
             except Exception as e:
                 self.get_logger().warn(f'读取手柄事件失败: {e}', throttle_duration_sec=2.0)
-
+                with self._fd_lock:
+                    fd = self._fd
+                    self._fd = None
+                if fd is not None:
+                    try:
+                        os.close(fd)
+                    except Exception:
+                        pass
     def publish_joy(self):
         """定时发布 Joy 消息。"""
         with self._lock:
@@ -119,9 +149,12 @@ class DiuNiuJoyPublisher(Node):
         self._running = False
         if self._ev_thread is not None:
             self._ev_thread.join(timeout=1.0)
-        if self._fd is not None:
+        with self._fd_lock:
+            fd = self._fd
+            self._fd = None
+        if fd is not None:
             try:
-                os.close(self._fd)
+                os.close(fd)
             except Exception:
                 pass
         self.get_logger().info('Joy 发布节点已关闭')

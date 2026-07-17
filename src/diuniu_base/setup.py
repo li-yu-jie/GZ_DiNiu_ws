@@ -28,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'diuniu_base = diuniu_base.diuniu_base_node:main',
+            'laserscan_filter = diuniu_base.laserscan_filter:main',
         ],
     },
 )
