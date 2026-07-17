@@ -1,1 +1,0 @@
-/home/y/GZ_DiNiu_ws/build/betop_teleop/launch/diuniu_teleop_serial.launch.py
