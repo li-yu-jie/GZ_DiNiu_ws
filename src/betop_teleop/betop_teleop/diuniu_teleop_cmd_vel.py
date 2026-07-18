@@ -5,7 +5,7 @@ DiuNiu 底盘手柄遥控节点 - 话题模式
 ===================================
 功能：
   - 订阅 ROS 2 /joy 话题，读取手柄数据
-  - 只负责发布 geometry_msgs/msg/Twist 到 /cmd_vel 话题，不占用任何物理串口
+  - 只负责发布 geometry_msgs/msg/Twist 到 /cmd_vel_joy 话题，不占用任何物理串口
   - 升降动作映射为 linear.z，急停动作映射为 angular.x
 """
 
@@ -53,7 +53,7 @@ class DiuNiuTeleopCmdVel(Node):
         self.linear_deadband = self.get_parameter('linear_deadband').value
         self.angular_deadband = self.get_parameter('angular_deadband').value
 
-        self.get_logger().info("🚀 [话题控制手柄节点] 正在启动，发布至 /cmd_vel 话题...")
+        self.get_logger().info("🚀 [话题控制手柄节点] 正在启动，发布至 /cmd_vel_joy 话题...")
         self.get_logger().info(f"配置参数: 最大线速={self.max_speed} m/s, 最大角速度={self.max_angular} rad/s")
 
         # ──────────────────────────────────────────
@@ -64,7 +64,7 @@ class DiuNiuTeleopCmdVel(Node):
         self._joy_lock = threading.Lock()
         
         # 创建 Twist 话题发布者
-        self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel', 10)
+        self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel_joy', 10)
         
         # 订阅 /joy
         self.joy_sub = self.create_subscription(Joy, '/joy', self.joy_callback, 10)

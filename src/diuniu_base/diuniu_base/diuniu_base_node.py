@@ -55,6 +55,7 @@ class DiuNiuBaseNode(Node):
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
         self.pub_imu = self.create_publisher(Imu, 'imu/data', 10)
         self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
+        self.sub_cmd_vel_joy = self.create_subscription(Twist, 'cmd_vel_joy', self.cmd_vel_joy_callback, 10)
         
         # ──────────────────────────────────────────
         # 3.1 TF 广播器
@@ -75,6 +76,16 @@ class DiuNiuBaseNode(Node):
         self.is_running = True
         self.read_thread = threading.Thread(target=self.serial_read_loop, daemon=True)
         self.read_thread.start()
+        
+                # ──────────────────────────────────────────
+        # 6. 控制指令与超时的 Watchdog 定时器
+        # ──────────────────────────────────────────
+        self.target_v = 0.0
+        self.target_w = 0.0
+        self.target_lift = 0
+        self.allow_pure_rotation = False
+        self.last_cmd_time = self.get_clock().now()
+        self.cmd_send_timer = self.create_timer(0.05, self.cmd_send_timer_callback)
         
         self.get_logger().info("🚀 DiuNiu ROS 2 驱动节点已启动，正在监听底盘数据流...")
 
@@ -127,15 +138,30 @@ class DiuNiuBaseNode(Node):
 
     def cmd_vel_callback(self, msg):
         """
-        处理手柄/Nav2下发的目标速度与控制动作
+        处理 Nav2 自主导航下发的目标速度 (支持原地自转)
         """
+        self.update_cmd_vel(msg, allow_pure_rotation=True)
+
+    def cmd_vel_joy_callback(self, msg):
+        """
+        处理手柄下发的目标速度 (不支持原地自转，原地只打角不走车)
+        """
+        self.update_cmd_vel(msg, allow_pure_rotation=False)
+
+    def update_cmd_vel(self, msg, allow_pure_rotation=False):
         # 1. 优先处理紧急停止 (通过 angular.x 通道传递)
         if msg.angular.x > 0.5:
             self.get_logger().error("🚨 [E-STOP] 收到手柄下发的紧急停止指令，底盘断电！")
             self.send_binary_cmd(0.0, 0.0, 0)
             self.send_cmd("stop\r\n")
+            self.target_v = 0.0
+            self.target_w = 0.0
+            self.target_lift = 0
             return
 
+        self.target_v = msg.linear.x
+        self.target_w = msg.angular.z
+        
         # 2. 处理升降动作 (通过 linear.z 通道传递)
         lift_cmd = 0
         if msg.linear.z > 0.5:
@@ -144,35 +170,58 @@ class DiuNiuBaseNode(Node):
         elif msg.linear.z < -0.5:
             self.get_logger().info("⬇️ [LIFT] 升降下降 (down)")
             lift_cmd = 2
+            
+        self.target_lift = lift_cmd
+        self.allow_pure_rotation = allow_pure_rotation
+        self.last_cmd_time = self.get_clock().now()
 
-        # 3. 正常行驶运动学逆解（Tricycle 三轮车模型），并发给 STM32
-        v = msg.linear.x
-        w = msg.angular.z
+    def cmd_send_timer_callback(self):
+        # 计算离上一次收到指令的时间
+        now = self.get_clock().now()
+        dt = (now - self.last_cmd_time).nanoseconds / 1e9
         
-        # 1. 车辆静止状态下 (V 接近 0)，允许原地打角（以调整前轮偏角），但驱动轮速度保持为 0
+        # 保护 1：如果超过 0.2 秒没收到任何话题指令，触发看门狗自动停机并把前轮打正
+        if dt > 0.2:
+            self.target_v = 0.0
+            self.target_w = 0.0
+            self.target_lift = 0
+            self.allow_pure_rotation = False
+            
+        # 运动学逆解（Tricycle 三轮车模型）
+        v = self.target_v
+        w = self.target_w
+        lift_cmd = self.target_lift
+        allow_pure_rotation = self.allow_pure_rotation
+        
+        # 1. 车辆静止状态下 (V 接近 0)，允许原地打角
         if abs(v) < 0.05:
-            v_front = 0.0
-            # 使用配置的最大角速度进行归一化映射，确保推满摇杆时能够打满物理极限 95 度
-            alpha_deg = (w / self.max_angular_speed) * 95.0
-            if alpha_deg > 95.0: alpha_deg = 95.0
-            if alpha_deg < -95.0: alpha_deg = -95.0
+            if allow_pure_rotation and abs(w) >= 0.05:
+                # 绕后轴中心自转：前轮垂直（打角 90度），前轮线速度为 |w| * L
+                alpha_deg = 90.0 if w > 0 else -90.0
+                v_front = abs(w) * self.wheelbase
+            else:
+                # 原地只打角不走车
+                v_front = 0.0
+                alpha_deg = (w / self.max_angular_speed) * 95.0
+                if alpha_deg > 95.0: alpha_deg = 95.0
+                if alpha_deg < -95.0: alpha_deg = -95.0
         # 2. 行驶状态下，执行正常的三轮车运动学正切计算与打角限幅
         else:
             # 三轮车运动学：alpha = atan(w * L / v)，倒车时保持正确符号
             alpha_rad = math.atan((w * self.wheelbase) / v)
             alpha_deg = math.degrees(alpha_rad)
-            # 避免除以 cos(alpha) 导致的转向时速度奇异激增，直接令前轮驱动速度等于目标线速度
             v_front = v
             
             # 软件物理限角保护限制在 [-95°, +95°] 内
             if alpha_deg > 95.0: alpha_deg = 95.0
             if alpha_deg < -95.0: alpha_deg = -95.0
             
-        # 调试日志：实时打印输入输出以确诊计算问题
-        self.get_logger().info(
-            f"🔍 [解算调试] v={v:.3f}, w={w:.3f} -> 前轮速={v_front:.3f} m/s, 前轮角={alpha_deg:.2f}°",
-            throttle_duration_sec=0.5
-        )
+        # 只有在小车在运动、或者看门狗没有触发（手柄/导航发布中）时才限速打印日志
+        if abs(v_front) > 0.01 or abs(alpha_deg) > 1.0 or dt <= 0.2:
+            self.get_logger().info(
+                f"🔍 [底盘发包] v_front={v_front:.3f} m/s, alpha={alpha_deg:.2f}°, lift={lift_cmd} | dt={dt:.2f}s",
+                throttle_duration_sec=0.5
+            )
 
         # 发送 14 字节的二进制控制数据包
         self.send_binary_cmd(v_front, alpha_deg, lift_cmd)

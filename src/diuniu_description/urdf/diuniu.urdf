@@ -90,9 +90,9 @@
   <joint name="laser_joint" type="fixed">
     <parent link="base_link"/>
     <child link="laser_link"/>
-    <!-- 车头位于 1.6m，雷达距车头 35cm，所以坐标是 1.6 - 0.35 = 1.25m -->
+    <!-- 雷达位于驱动轮/转向轮向后 8.5cm，坐标是 1.3 - 0.085 = 1.215m -->
     <!-- 假设高度装在 0.6m 处，可根据实际支架高度修改 Z 值 -->
-    <origin xyz="1.25 0 0.6" rpy="0 0 0"/> 
+    <origin xyz="1.215 0 0.6" rpy="0 0 0"/> 
   </joint>
 
 </robot>
