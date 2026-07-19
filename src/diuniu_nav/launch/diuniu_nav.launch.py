@@ -28,6 +28,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from launch.conditions import UnlessCondition, IfCondition
+from nav2_common.launch import RewrittenYaml
 
 def generate_launch_description():
     pkg_nav = get_package_share_directory('diuniu_nav')
@@ -42,6 +43,21 @@ def generate_launch_description():
     # 默认文件路径：2D 栅格地图 + Nav2 参数文件
     default_map = os.path.join(pkg_nav, 'maps', 'map.yaml')
     default_params = os.path.join(pkg_nav, 'config', 'nav2_params.yaml')
+
+    # ★ 自定义行为树（已移除 Spin 90° 恢复动作，防 Tricycle 伪原地自转扫墙/撞墙转圈）
+    # bt_navigator 只会在 nav2_bt_navigator 自家目录解析相对文件名，
+    # 因此这里用 RewrittenYaml 在启动时把绝对路径注入参数文件（生成临时 yaml）
+    default_bt_xml = os.path.join(
+        pkg_nav, 'behavior_trees', 'navigate_to_pose_w_replanning_and_recovery_no_spin.xml')
+    configured_params = RewrittenYaml(
+        source_file=params_file,
+        root_key='',
+        param_rewrites={
+            'default_nav_to_pose_bt_xml': default_bt_xml,
+            'default_bt_xml_filename': default_bt_xml,
+        },
+        convert_types=True
+    )
 
     # Launch 配置项（运行时可通过 xxx:=yyy 覆盖）
     map_yaml = LaunchConfiguration('map')
@@ -78,7 +94,7 @@ def generate_launch_description():
                 PythonLaunchDescriptionSource(os.path.join(pkg_nav_bringup, 'launch', 'bringup_launch.py')),
                 launch_arguments={
                     'map': map_yaml,
-                    'params_file': params_file,
+                    'params_file': configured_params,
                     'use_sim_time': use_sim_time,
                     'autostart': 'true'
                 }.items()
@@ -102,7 +118,7 @@ def generate_launch_description():
                         PythonLaunchDescriptionSource(os.path.join(pkg_nav_bringup, 'launch', 'localization_launch.py')),
                         launch_arguments={
                             'map': map_yaml,
-                            'params_file': params_file,
+                            'params_file': configured_params,
                             'use_sim_time': use_sim_time,
                             'autostart': 'true'
                         }.items()
@@ -120,7 +136,7 @@ def generate_launch_description():
                         executable='map_server',
                         name='map_server',
                         output='screen',
-                        parameters=[params_file, {'yaml_filename': map_yaml}]
+                        parameters=[configured_params, {'yaml_filename': map_yaml}]
                     ),
                     # 2. 生命周期管理器：自动激活 map_server
                     Node(
@@ -149,7 +165,7 @@ def generate_launch_description():
                 launch_arguments={
                     'use_sim_time': use_sim_time,
                     'autostart': 'true',
-                    'params_file': params_file
+                    'params_file': configured_params
                 }.items()
             )
         ]

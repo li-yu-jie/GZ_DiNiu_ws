@@ -36,6 +36,15 @@
    * FAST-LIO 内部估计的是 IMU/LiDAR 帧位姿，原始代码直接把它发布为 `base_link`，导致车身模型在 RViz 中整体向前偏移约 $1.2\text{m}$。
    * 已在 `src/FAST_LIO/src/laserMapping.cpp` 中修正：`/Odometry`、`odom → base_link` TF、`/cloud_registered_body` 点云均在发布前转换到真正的 `base_link` 系。
 
+9. **禁用 Spin 原地旋转恢复（根治“导航中突然转 90°、持续转圈撞墙不停”事故）**：
+   * **现象**：导航途中车辆突然原地旋转 90°，随后反复转圈，撞到墙也不停止。
+   * **根因**：Nav2 默认行为树中卡死恢复动作包含 `Spin spin_dist="1.57"`（原地转 90°）。Tricycle 前驱转向三轮车**无法真正原地自转**，底盘只能以“前轮打 ±90° + 高速驱动”近似旋转，车身实际扫掠面积远大于 Nav2 Spin 插件按 footprint 纯旋转仿真的碰撞检测范围——仿真认为安全，实车却扫墙/撞墙；且 `RecoveryNode` 会多次重试（清代价地图 → Spin → Wait → BackUp 循环），表现为持续转圈撞墙不停。
+   * **修复**：
+     * 新增自定义行为树 `src/diuniu_nav/behavior_trees/navigate_to_pose_w_replanning_and_recovery_no_spin.xml`，恢复动作仅保留 **清代价地图 → Wait 5s → BackUp 0.30m**；`diuniu_nav.launch.py` 启动时通过 `RewrittenYaml` 自动注入其绝对路径，无需手动配置。
+     * `behavior_server` 的 `behavior_plugins` 移除 `spin`，仅保留 `backup`/`wait`。
+     * `progress_checker` 卡死判定时限由 3s 放宽至 **6s**（`movement_time_allowance: 6.0`），减少长车身重载低速蠕行时的误触发。
+   * **注意**：恢复行为（behavior_server）直接发布 `/cmd_vel`，不经过 velocity_smoother，动作较突兀；BackUp 为低速后退（0.05 m/s），后方无雷达视野，请在相对开阔区域使用。
+
 ---
 
 ## 🚀 一键启动全部导航节点（推荐）
