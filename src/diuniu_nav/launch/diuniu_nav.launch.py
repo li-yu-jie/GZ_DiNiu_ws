@@ -44,27 +44,34 @@ def generate_launch_description():
     default_map = os.path.join(pkg_nav, 'maps', 'map.yaml')
     default_params = os.path.join(pkg_nav, 'config', 'nav2_params.yaml')
 
-    # ★ 自定义行为树（已移除 Spin 90° 恢复动作，防 Tricycle 伪原地自转扫墙/撞墙转圈）
-    # bt_navigator 只会在 nav2_bt_navigator 自家目录解析相对文件名，
-    # 因此这里用 RewrittenYaml 在启动时把绝对路径注入参数文件（生成临时 yaml）
-    default_bt_xml = os.path.join(
-        pkg_nav, 'behavior_trees', 'navigate_to_pose_w_replanning_and_recovery_no_spin.xml')
-    configured_params = RewrittenYaml(
-        source_file=params_file,
-        root_key='',
-        param_rewrites={
-            'default_nav_to_pose_bt_xml': default_bt_xml,
-            'default_bt_xml_filename': default_bt_xml,
-        },
-        convert_types=True
-    )
-
     # Launch 配置项（运行时可通过 xxx:=yyy 覆盖）
     map_yaml = LaunchConfiguration('map')
     params_file = LaunchConfiguration('params_file')
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_amcl = LaunchConfiguration('use_amcl')
     use_relocalization = LaunchConfiguration('use_relocalization')
+
+    # ★ 自定义行为树（已移除 Spin 90° 恢复动作，防 Tricycle 伪原地自转扫墙/撞墙转圈）
+    # bt_navigator 只会在 nav2_bt_navigator 自家目录解析相对文件名，
+    # 因此这里用 RewrittenYaml 在启动时把绝对路径注入参数文件（生成临时 yaml）
+    # ⚠️ to_pose 与 through_poses 两棵树都必须换成无 Spin 版：
+    #    behavior_server 已禁用 spin 插件，默认 through_poses 树里的 <Spin>
+    #    会让 bt_navigator 激活失败（"spin action server not available"），
+    #    导致整车导航目标被全部拒绝
+    default_bt_xml = os.path.join(
+        pkg_nav, 'behavior_trees', 'navigate_to_pose_w_replanning_and_recovery_no_spin.xml')
+    default_bt_xml_through_poses = os.path.join(
+        pkg_nav, 'behavior_trees', 'navigate_through_poses_w_replanning_and_recovery_no_spin.xml')
+    configured_params = RewrittenYaml(
+        source_file=params_file,
+        root_key='',
+        param_rewrites={
+            'default_nav_to_pose_bt_xml': default_bt_xml,
+            'default_bt_xml_filename': default_bt_xml,
+            'default_nav_through_poses_bt_xml': default_bt_xml_through_poses,
+        },
+        convert_types=True
+    )
 
     # 声明启动参数
     declare_map = DeclareLaunchArgument('map', default_value=default_map, description='2D 栅格地图 yaml 完整路径')
