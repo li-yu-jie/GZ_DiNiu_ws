@@ -18,3 +18,4 @@ __pycache__/
 # 系统垃圾文件（忽略）
 .DS_Store
 Thumbs.db
+.claude/
