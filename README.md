@@ -161,7 +161,7 @@ ros2 launch diuniu_nav diuniu_nav.launch.py use_amcl:=true
 在需要手柄介入遥控时，在 **【终端 4】** 中运行：
 
 ```bash
-1cd ~/GZ_DiNiu_ws
+cd ~/GZ_DiNiu_ws
 source install/setup.bash
 ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py
 ```
@@ -176,12 +176,12 @@ ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py
 
 ## 🖥️ 启动可视化监控与操作指南
 
-在 **【终端 5】** 中运行（需在 NoMachine 图形桌面环境内）：
+在 **【终端 5】** 中运行：
 
 ```bash
 cd ~/GZ_DiNiu_ws
 source install/setup.bash
-ros2 run rviz2 rviz2 -d /opt/ros/humble/share/nav2_bringup/rviz/nav2_default_view.rviz
+ros2 run rviz2 rviz2 -d ~/GZ_DiNiu_ws/install/diuniu_nav/share/diuniu_nav/rviz/diuniu_nav.rviz
 ```
 
 ### 1. 手动重定位对齐（针对模式二 AMCL 与模式一 B）

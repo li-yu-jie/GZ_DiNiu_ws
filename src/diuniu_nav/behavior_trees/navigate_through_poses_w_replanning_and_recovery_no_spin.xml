@@ -1,15 +1,11 @@
 <!--
-  navigate_through_poses 无 Spin 版（由 nav2 默认 through-poses 行为树移除 Spin 得到）
-  移除原因：Tricycle 底盘无法真正原地自转，"前轮打90°+驱动"的近似旋转会扫墙/撞墙，
-  behavior_server 已禁用 spin 插件（behavior_plugins: ["backup", "wait"]），
-  若行为树仍引用 <Spin>，bt_navigator 激活时会因 "spin action server not available"
-  加载整棵树失败，导致 bt_navigator 卡 inactive、所有导航目标被拒绝。
+  navigate_through_poses 行为树（2.0Hz 快速重新规划）
 -->
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <RecoveryNode number_of_retries="6" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
-        <RateController hz="0.333">
+        <RateController hz="2.0">
           <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
             <ReactiveSequence>
               <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.7"/>
@@ -26,12 +22,12 @@
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <RoundRobin name="RecoveryActions">
-          <Sequence name="ClearingActions">
+          <Sequence name="BackUpAndClear">
+            <BackUp backup_dist="0.40" backup_speed="0.08"/>
             <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <Wait wait_duration="5"/>
-          <BackUp backup_dist="0.30" backup_speed="0.05"/>
+          <Wait wait_duration="2"/>
         </RoundRobin>
       </ReactiveFallback>
     </RecoveryNode>

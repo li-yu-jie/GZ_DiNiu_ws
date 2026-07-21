@@ -1,17 +1,12 @@
 <!--
-  地牛叉车自定义导航行为树（基于 nav2 默认 navigate_to_pose_w_replanning_and_recovery.xml 修改）
-
-  ★ 修改点：移除了恢复动作中的 <Spin spin_dist="1.57"/>（原地旋转 90°）
-  原因：Tricycle 前驱转向三轮车无法真正原地自转，底盘只能以“前轮打 ±90° + 高速驱动”
-  近似旋转，实际扫掠面积远大于 Nav2 Spin 插件按 footprint 纯旋转仿真的碰撞检测范围，
-  会出现“卡死 → Spin 90° → 扫墙/撞墙仍不停 → RecoveryNode 重试循环 → 持续转圈”的事故。
-  恢复动作仅保留：清代价地图 → Wait 5s → BackUp 0.30m（低速后退，由碰撞检测保护）。
+  地牛叉车自定义导航行为树
+  ★ 重新规划频率提升至 2.0Hz，人走后 0.5s 内秒级重新规划直行最短路线。
 -->
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <RecoveryNode number_of_retries="6" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
-        <RateController hz="1.0">
+        <RateController hz="2.0">
           <RecoveryNode number_of_retries="1" name="ComputePathToPose">
             <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
@@ -25,12 +20,12 @@
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <RoundRobin name="RecoveryActions">
-          <Sequence name="ClearingActions">
+          <Sequence name="BackUpAndClear">
+            <BackUp backup_dist="0.40" backup_speed="0.08"/>
             <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <Wait wait_duration="5"/>
-          <BackUp backup_dist="0.30" backup_speed="0.05"/>
+          <Wait wait_duration="2"/>
         </RoundRobin>
       </ReactiveFallback>
     </RecoveryNode>

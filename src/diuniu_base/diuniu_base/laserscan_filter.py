@@ -12,7 +12,7 @@ class LaserScanFilter(Node):
         super().__init__('laserscan_filter')
         
         self.declare_parameter('x_min', -0.25)
-        self.declare_parameter('x_max', 2.60)
+        self.declare_parameter('x_max', 1.30)
         self.declare_parameter('y_min', -0.40)
         self.declare_parameter('y_max', 0.40)
         self.declare_parameter('laser_x_offset', 0.0)

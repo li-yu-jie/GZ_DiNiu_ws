@@ -191,7 +191,7 @@ def generate_launch_description():
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.05,
-            'min_height': 0.15,       # 切片下限抬高到地面以上 15cm，过滤地板反光噪点（防"满地障碍"）
+            'min_height': 0.10,       # ★ 设为 10cm！全面捕捉前方人体脚踝、鞋子与低矮障碍物，绝不漏扫撞人
             'max_height': 1.2,        # 切片上限 1.2m，覆盖常见货架/人腿高度
             'angle_min': -3.1415926,  # 全周 360° 扫描
             'angle_max': 3.1415926,
@@ -218,7 +218,7 @@ def generate_launch_description():
         name='laserscan_filter',
         parameters=[{
             'x_min': -0.25,
-            'x_max': 1.60,
+            'x_max': 1.30,
             'y_min': -0.35,
             'y_max': 0.35,
             'laser_x_offset': 0.0,
