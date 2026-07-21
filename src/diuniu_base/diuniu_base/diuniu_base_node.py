@@ -84,6 +84,7 @@ class DiuNiuBaseNode(Node):
         self.target_w = 0.0
         self.target_lift = 0
         self.allow_pure_rotation = False
+        self.last_sent_alpha = 0.0
         self.last_cmd_time = self.get_clock().now()
         self.cmd_send_timer = self.create_timer(0.05, self.cmd_send_timer_callback)
         
@@ -210,11 +211,24 @@ class DiuNiuBaseNode(Node):
             # 三轮车运动学：alpha = atan(w * L / v)，倒车时保持正确符号
             alpha_rad = math.atan((w * self.wheelbase) / v)
             alpha_deg = math.degrees(alpha_rad)
-            v_front = v
             
             # 软件物理限角保护限制在 [-95°, +95°] 内
             if alpha_deg > 95.0: alpha_deg = 95.0
             if alpha_deg < -95.0: alpha_deg = -95.0
+
+            # 转向电机打角前馈与动态协调 (MCU Steering Lead)
+            delta_alpha = abs(alpha_deg - self.last_sent_alpha)
+            if delta_alpha > 15.0:
+                # 弯道剧烈打角时向单片机发送 1.35 倍前馈超频指令，加速电机响应
+                alpha_lead = self.last_sent_alpha + 1.35 * (alpha_deg - self.last_sent_alpha)
+                if alpha_lead > 95.0: alpha_lead = 95.0
+                if alpha_lead < -95.0: alpha_lead = -95.0
+                alpha_deg = alpha_lead
+                v_front = v * 0.8  # 瞬态微调车速给电机留出打角时间
+            else:
+                v_front = v
+
+            self.last_sent_alpha = alpha_deg
             
         # 只有在小车在运动、或者看门狗没有触发（手柄/导航发布中）时才限速打印日志
         if abs(v_front) > 0.01 or abs(alpha_deg) > 1.0 or dt <= 0.2:
