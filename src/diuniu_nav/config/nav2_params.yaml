@@ -214,8 +214,8 @@ local_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除离开的动态/虚假障碍物！
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0          # 快速衰减，彻底消除虚假“空气墙”
-        inflation_radius: 0.45          # 局部避障膨胀半径恢复至 0.45m，通道保持 100% 畅通
+        cost_scaling_factor: 5.0          # ★ 指数快速衰减，确保通道中央为零代价
+        inflation_radius: 0.32          # ★ 膨胀半径优化为 0.32m，弯道有效通行宽度拓宽 26cm，彻底消除卡死！
       always_send_full_costmap: true
 
 # ---------- 全局代价地图：静态地图 + 实时障碍，供全局规划 ----------
@@ -251,8 +251,8 @@ global_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除鬼影障碍物
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 2.0          # 衰减平滑
-        inflation_radius: 0.55          # 全局膨胀半径设为 0.55m
+        cost_scaling_factor: 5.0          # ★ 全局代价指数快速衰减
+        inflation_radius: 0.32          # ★ 全局膨胀半径同步设为 0.32m，保证路径规划通畅
       always_send_full_costmap: true
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
