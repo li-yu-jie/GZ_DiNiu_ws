@@ -174,7 +174,7 @@ controller_server:
       use_cost_regulated_linear_velocity_scaling: true
       cost_scaling_dist: 0.8             # ★ 扩大探测距离至 0.8m，提早感知内墙壁的存在
       cost_scaling_gain: 10.0
-      inflation_cost_scaling_factor: 3.5         # ★ 提高排斥系数至 3.5！当靠近内墙壁时，迫使 RPP 控制器主动往外弯（低代价区）打角偏航，实现物理切外弯！
+      inflation_cost_scaling_factor: 3.5         # 注意：此项只在靠近高代价区时降低线速度（不控制方向！RPP 纯追踪永远只追预瞄点，无侧向避障能力）。贴墙时自动降速，配合全局 V 谷居中路径实现切外弯
       use_rotate_to_heading: false  # 禁用 RPP 原地自转对齐。防止长车身货叉在转弯时原地旋转扫墙导致避障卡死
       allow_reversing: false        # 禁止倒车（后向无雷达视野，安全风险）
 
@@ -253,8 +253,8 @@ global_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除鬼影障碍物
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 1.5          # ★ 降至 1.5，让墙壁的代价坡度极其宽缓地向通道中央延伸，形成深 V 代价谷底
-        inflation_radius: 0.38          # ★ 设为 0.38m，提供 3cm 额外车宽物理保护，强制全局参考路径避开墙壁！
+        cost_scaling_factor: 1.5          # 保持 1.5，让墙壁的代价坡度极其宽缓地向通道中央延伸
+        inflation_radius: 1.8           # ★ 0.38→1.8m！实测最窄通道宽1.7m/典型3.4m，1.8m 膨胀让两侧墙的代价坡度在通道中线交叠形成真正的深 V 谷底（0.38m 时通道中央是平坦零代价区，规划器无居中动力导致贴墙走）。代价只与离墙距离有关，增大半径不会封锁窄通道（1.7m 通道中线代价仅 ~110，远低于 253 致命值），配合 cost_penalty 8.0 强迫全局路径走中线、过弯自然切外弯
       always_send_full_costmap: false     # ★ 设为 false！只发布全局代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
@@ -283,8 +283,8 @@ planner_server:
       reverse_penalty: 2.1
       change_penalty: 0.5              # ★ 增大打角变化惩罚，让弯道过渡更平滑
       non_straight_penalty: 1.8        # ★ 提高转向惩罚，迫使路径在弯道前尽量走直线直插弯心，实现拐大向外甩尾
-      cost_penalty: 8.0                # ★ 代价权重暴增至 8.0！迫使路径极其敏感于任何墙壁代价，只走零代价的通道中线
-      cost_power: 3.0                  # ★ 代价指数放大至 3.0！让贴墙代价呈立方级爆炸，彻底根除靠墙走的倾向
+      cost_penalty: 50.0                # ★ 权重极大化提升至 50.0！彻底碾压路径长度权重，强迫全局路径必须走在代价值最低的通道中线，绝不切近弯
+      cost_power: 3.0                  # ★ 代价指数放大至 3.0
       minimum_turning_radius: 1.05        # ★ 调小至 1.05m（给予全局规划器更大的自由度，使其规划出的绿色路线能够远离内墙角，走外线过弯！）
       lookup_table_size: 20.0
       cache_obstacle_heuristic: false
