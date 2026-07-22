@@ -170,7 +170,7 @@ controller_server:
       # 规则化速度缩放：结合大预瞄与拐大向，弯道保持 0.25m/s 高速顺畅过弯
       use_regulated_linear_velocity_scaling: true
       regulated_linear_scaling_min_speed: 0.25   # ★ 弯道过弯速度提升至 0.25m/s (25cm/s)
-      regulated_linear_scaling_min_radius: 1.0   # 弯道曲率降速阈值
+      regulated_linear_scaling_min_radius: 1.5   # ★ 增大至 1.5m！因为叉车转弯半径规划为 1.3m。当探测到转弯半径 < 1.5m 时强制小车平稳降速至 0.25m/s（降速后预瞄收缩至 0.6m，从而能打满舵急转弯，防止冲出跑道撞外墙！）
       use_cost_regulated_linear_velocity_scaling: true
       cost_scaling_dist: 0.8             # ★ 扩大探测距离至 0.8m，提早感知内墙壁的存在
       cost_scaling_gain: 10.0
