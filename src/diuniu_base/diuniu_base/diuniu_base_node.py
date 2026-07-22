@@ -307,10 +307,17 @@ class DiuNiuBaseNode(Node):
         dt = (current_time - self.last_time).nanoseconds / 1e9
         self.last_time = current_time
 
-        # 1. 航迹推算 (Odometry Integration)
-        self.th += wz * dt
-        self.x += vx * math.cos(self.th) * dt
-        self.y += vx * math.sin(self.th) * dt
+        # 1. dt 异常拦截 (防开机首帧大 dt 冲激)
+        if dt <= 0.0 or dt > 0.5:
+            dt = 0.0
+
+        # 2. 中点弧线积分 (Midpoint Runge-Kutta 2nd Order Integration)
+        # 相比传统欧拉积分，中点积分能精准还原转弯时的弧线运动，消除过弯积算误差
+        delta_th = wz * dt
+        half_th = self.th + delta_th / 2.0
+        self.x += vx * math.cos(half_th) * dt
+        self.y += vx * math.sin(half_th) * dt
+        self.th += delta_th
 
         # 调试日志：每秒打印一次从串口收到的实际速度与积分出的坐标
         self.get_logger().info(
