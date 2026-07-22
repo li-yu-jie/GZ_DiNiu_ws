@@ -80,10 +80,19 @@
 
   // ---------- 地图接收与离屏渲染 ----------
   App.on('map', function (msg) {
+    MV.lastMapMsg = msg;              // 备份，供退出修图后恢复
     MV.map = msg;
     renderMapImage();
     MV.dirty = true;
     App.emit('map-info', msg.info);
+  });
+  // 退出修图/禁区编辑后恢复真实栅格（热加载后 map_server 会推新图自动覆盖）
+  App.on('editor-exited', function () {
+    if (MV.lastMapMsg) {
+      MV.map = MV.lastMapMsg;
+      renderMapImage();
+    }
+    MV.dirty = true;
   });
   App.on('scan', m => { MV.scan = m; });
   App.on('plan', m => { MV.plan = m; MV.dirty = true; });
