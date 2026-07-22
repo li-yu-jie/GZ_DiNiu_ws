@@ -254,7 +254,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0          # 稍微缓和衰减，让墙壁代价延伸稍远，推开路径
-        inflation_radius: 0.95          # ★ 0.65→0.95m：再多推开 30cm，过弯时路径远离内墙角
+        inflation_radius: 0.75          # 0.75m：收回至适中范围，配合规划器参数推外弯
       always_send_full_costmap: false     # ★ 设为 false！只发布全局代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
@@ -282,9 +282,9 @@ planner_server:
       analytic_expansion_max_length: 25.0 # ★ 增大最大解析长度至 25.0m，长距离直接解析连接，免去冗余搜索
       reverse_penalty: 2.1
       change_penalty: 0.5              # ★ 增大打角变化惩罚，让弯道过渡更平滑
-      non_straight_penalty: 1.5        # ★ 提高转向惩罚，让规划器倾向于提前直走、弧度更大地绕外弯（而非紧切内角）
-      cost_penalty: 3.5                # 标准代价惩罚
-      minimum_turning_radius: 1.3        # 地牛叉车物理最小转弯半径 1.3m
+      non_straight_penalty: 2.2        # ★ 提高至 2.2：强迫规划器在弯道前尽量直走再大弧度甩外弯，路径自然偏外侧
+      cost_penalty: 5.0                # ★ 提高至 5.0：增加贴墙惩罚，使路径向通道中央靠拢
+      minimum_turning_radius: 1.45       # ★ 提高至 1.45m：规划器按 1.45m 半径规划弧线，弯道弧度更宽，远离内墙角
       lookup_table_size: 20.0
       cache_obstacle_heuristic: false
       debug_visualizations: false
