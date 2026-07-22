@@ -41,14 +41,14 @@ amcl:
     odom_frame_id: odom
     pf_err: 0.05
     pf_z: 0.99
-    recovery_alpha_fast: 0.0            # ★ 关闭过度的随机粒子全局撒点
-    recovery_alpha_slow: 0.0            # 关闭慢速散布，保持粒子束紧密聚拢在匹配点
+    recovery_alpha_fast: 0.1            # ★ 开启快速粒子恢复：位置偏移后自动注入新粒子搜索正确位置
+    recovery_alpha_slow: 0.001          # 开启慢速恢复：持续缓慢补充粒子，防止长时间漂移后无法自纠
     resample_interval: 1
     # ⚠️ 差速运动模型：Tricycle 无严格匹配的 AMCL 模型，用差速模型近似（转向角受限，够用）
     robot_model_type: nav2_amcl::DifferentialMotionModel
     save_pose_rate: 0.5
     set_initial_pose: false              # 不强制使用固定初始位姿；模式 A-2 首次需通过 RViz 2D Pose Estimate 给出粗位姿
-    sigma_hit: 0.15                     # ★ 收紧至 0.15：激光命中模型更严格，提高场景匹配精度，减少粒子漂移
+    sigma_hit: 0.2                      # ★ 适度放宽至 0.2：兼顾匹配精度与粒子收敛速度，偏移后能更快找回正确位置
     update_min_d: 0.02                   # ★ 0.02m：高精平滑跟进位姿更新
     update_min_a: 0.02                   # ★ 0.02rad：高精旋转跟进更新
     # 观测模型权重：hit(命中)/short(意外近-人体)/max(超程)/rand(随机)

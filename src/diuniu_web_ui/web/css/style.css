@@ -1,0 +1,117 @@
+/* ===== 地牛叉车 Web 控制端样式 ===== */
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #1e1e2e; color: #e0e0e0; }
+
+.hidden { display: none !important; }
+
+/* ===== 顶栏 ===== */
+#topbar {
+  height: 48px; display: flex; align-items: center; gap: 10px;
+  padding: 0 12px; background: #2a2a3c; border-bottom: 1px solid #444;
+  flex-wrap: nowrap; overflow-x: auto;
+}
+#title { font-weight: bold; white-space: nowrap; }
+#mode-group { display: flex; align-items: center; gap: 6px; }
+#mode-label { font-size: 12px; color: #aaa; white-space: nowrap; }
+
+.dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.dot-green { background: #4caf50; box-shadow: 0 0 6px #4caf50; }
+.dot-red { background: #f44336; box-shadow: 0 0 6px #f44336; }
+.dot-yellow { background: #ff9800; }
+
+/* ===== 按钮 ===== */
+.btn {
+  background: #3d3d55; color: #e0e0e0; border: 1px solid #555;
+  border-radius: 6px; padding: 6px 12px; font-size: 14px; cursor: pointer;
+  white-space: nowrap; user-select: none;
+}
+.btn:active { background: #55557a; }
+.btn-danger { background: #6e2b2b; border-color: #a33; }
+.btn-warn { background: #6e5a1e; border-color: #a93; }
+.btn-mode.active { background: #2b5d8a; border-color: #4af; }
+
+/* ===== 主区域布局 ===== */
+#main { display: flex; height: calc(100% - 48px); }
+
+/* 左侧工具栏 */
+#toolbar {
+  width: 56px; background: #2a2a3c; display: flex; flex-direction: column;
+  align-items: center; padding-top: 8px; gap: 4px; border-right: 1px solid #444;
+}
+#toolbar hr { width: 70%; border-color: #444; margin: 4px 0; }
+.tool {
+  width: 46px; min-height: 46px; background: none; border: 2px solid transparent;
+  border-radius: 8px; font-size: 18px; cursor: pointer; color: #ccc;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.tool span { font-size: 10px; }
+.tool.active { border-color: #4af; background: #2b5d8a55; }
+
+/* 地图区 */
+#map-container { flex: 1; position: relative; overflow: hidden; background: #111; }
+#map-canvas { position: absolute; inset: 0; touch-action: none; }
+
+/* 修图工具条 */
+#editor-bar {
+  position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  background: #2a2a3cee; border: 1px solid #555; border-radius: 8px;
+  padding: 6px 10px; display: flex; align-items: center; gap: 8px; z-index: 20;
+  flex-wrap: wrap; max-width: 95%;
+}
+.editor-brush.active { background: #2b5d8a; border-color: #4af; }
+#editor-bar label { font-size: 13px; display: flex; align-items: center; gap: 4px; }
+
+/* 摇杆 */
+#joystick-zone { position: absolute; left: 20px; bottom: 20px; z-index: 15; text-align: center; }
+#joystick-base {
+  width: 130px; height: 130px; border-radius: 50%; background: #ffffff18;
+  border: 2px solid #ffffff44; position: relative; touch-action: none;
+}
+#joystick-knob {
+  width: 52px; height: 52px; border-radius: 50%; background: #4a9effaa;
+  border: 2px solid #4af; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%); pointer-events: none;
+}
+#joystick-hint { font-size: 11px; color: #999; margin-top: 4px; }
+
+/* 提示气泡 */
+#toast {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  background: #333d; color: #fff; padding: 8px 18px; border-radius: 20px;
+  font-size: 14px; z-index: 30; pointer-events: none; max-width: 90%;
+}
+
+/* ===== 右侧面板 ===== */
+#panel {
+  width: 290px; background: #262637; border-left: 1px solid #444;
+  overflow-y: auto; padding: 8px; flex-shrink: 0;
+}
+.panel-section { margin-bottom: 12px; background: #2e2e42; border-radius: 8px; padding: 8px 10px; }
+.panel-section h3 { font-size: 14px; margin-bottom: 6px; color: #8ec9ff; }
+#nav-state { font-size: 13px; margin-bottom: 4px; }
+#nav-feedback { font-size: 13px; color: #ffd54f; margin-bottom: 6px; }
+.row { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 6px 0; }
+#sec-nav .btn { width: 100%; margin-top: 4px; }
+
+#sensor-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+#sensor-table td { padding: 3px 4px; border-bottom: 1px solid #3a3a50; }
+#sensor-table td:first-child { color: #999; width: 70px; }
+#node-list { font-size: 11px; color: #9f9; max-height: 150px; overflow-y: auto; word-break: break-all; }
+
+#waypoint-list { font-size: 13px; max-height: 220px; overflow-y: auto; }
+.wp-item {
+  display: flex; align-items: center; gap: 6px; padding: 5px 4px;
+  border-bottom: 1px solid #3a3a50;
+}
+.wp-item .wp-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.wp-item button { font-size: 11px; padding: 3px 7px; }
+
+#log-area { font-size: 11px; max-height: 160px; overflow-y: auto; color: #bbb; }
+#log-area div { padding: 1px 0; border-bottom: 1px dashed #3a3a50; }
+
+/* 移动端适配：面板可收起 */
+@media (max-width: 768px) {
+  #panel { position: absolute; right: 0; top: 0; height: 100%; z-index: 25; box-shadow: -4px 0 12px #000a; }
+  #panel.collapsed { transform: translateX(100%); }
+  #panel { transition: transform 0.2s; }
+}
