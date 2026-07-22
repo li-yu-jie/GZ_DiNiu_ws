@@ -53,6 +53,7 @@ class DiuNiuBaseNode(Node):
         # 3. ROS 2 话题发布与订阅
         # ──────────────────────────────────────────
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
+        self.pub_wheel_odom = self.create_publisher(Odometry, 'wheel_odom', 10)
         self.pub_imu = self.create_publisher(Imu, 'imu/data', 10)
         self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         self.sub_cmd_vel_joy = self.create_subscription(Twist, 'cmd_vel_joy', self.cmd_vel_joy_callback, 10)
@@ -348,6 +349,29 @@ class DiuNiuBaseNode(Node):
         # 设置速度 (Vx, Wz)
         odom.twist.twist.linear.x = vx
         odom.twist.twist.angular.z = wz
+
+        # 设置位姿和速度协方差矩阵 (标准轮式里程计协方差)
+        odom.pose.covariance = [
+            0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.99, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.99, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.99, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.05
+        ]
+        odom.twist.covariance = [
+            0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.99, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.99, 0.0, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.99, 0.0,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.05
+        ]
+
+        # 始终发布独立的轮式里程计话题 /wheel_odom (供监控、融合及可视化使用)
+        self.pub_wheel_odom.publish(odom)
+
+        # 当参数允许时，同步发布 /odom 话题
         if self.pub_odom_topic:
             self.pub_odom.publish(odom)
 
