@@ -29,7 +29,7 @@ class DiuNiuBaseNode(Node):
         # ──────────────────────────────────────────
         # 1. 声明并读取 ROS 2 参数
         # ──────────────────────────────────────────
-        self.declare_parameter('serial_port', '/dev/ttyACM0')
+        self.declare_parameter('serial_port', '/dev/ttyUSB0')
         self.declare_parameter('baud_rate', 460800)
         self.declare_parameter('wheelbase', 1.30)  # 物理轴距 L = 1.30m
         self.declare_parameter('max_angular_speed', 2.5) # 最大角速度参考值
