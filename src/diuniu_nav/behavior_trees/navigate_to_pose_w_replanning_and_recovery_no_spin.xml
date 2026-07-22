@@ -20,9 +20,8 @@
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <RoundRobin name="RecoveryActions">
-          <Wait wait_duration="2.0"/>   <!-- ★ 第一顺位：有人走过时先原地耐心等待 2.0 秒，人走开即继续直行，不倒车！ -->
-          <Sequence name="BackUpAndClear"> <!-- 二次受阻：才执行倒车 30cm 并清理地图，重新规划绕行 -->
-            <BackUp backup_dist="0.30" backup_speed="0.08"/>
+          <Wait wait_duration="15.0"/>  <!-- ★ 原地耐心等待 15.0 秒，人走开即继续前行，不执行任何倒车动作 -->
+          <Sequence name="ClearCostmaps">
             <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
