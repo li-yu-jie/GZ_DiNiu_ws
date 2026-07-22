@@ -218,13 +218,13 @@ class DiuNiuBaseNode(Node):
 
             # 转向电机打角前馈与动态协调 (MCU Steering Lead)
             delta_alpha = abs(alpha_deg - self.last_sent_alpha)
-            if delta_alpha > 15.0:
-                # 弯道剧烈打角时向单片机发送 1.35 倍前馈超频指令，加速电机响应
+            if delta_alpha > 25.0:
+                # 仅在弯道剧烈打角（>25°）时触发前馈超频与降速配合，直道微调完全不干预
                 alpha_lead = self.last_sent_alpha + 1.35 * (alpha_deg - self.last_sent_alpha)
                 if alpha_lead > 95.0: alpha_lead = 95.0
                 if alpha_lead < -95.0: alpha_lead = -95.0
                 alpha_deg = alpha_lead
-                v_front = v * 0.8  # 瞬态微调车速给电机留出打角时间
+                v_front = v * 0.8  # 仅在直角弯打角瞬态微调车速
             else:
                 v_front = v
 

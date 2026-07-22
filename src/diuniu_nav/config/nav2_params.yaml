@@ -157,9 +157,9 @@ controller_server:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
       desired_linear_vel: 0.4           # 期望线速度 0.4m/s（长车身重载，保守取值）
       lookahead_dist: 1.6
-      min_lookahead_dist: 0.6          # ★ 调小至 0.6m！让小车在低速过直角弯时“走深一点再转弯”（拐大向），防止提前切弯导致内侧轮差刮墙！
+      min_lookahead_dist: 0.8          # ★ 增大至 0.8m！彻底消除直道快速行驶时的“画龙”摆动，保持直线稳如磐石
       max_lookahead_dist: 2.5
-      lookahead_time: 1.5               # 预瞄距离随速度动态缩放的时间常数
+      lookahead_time: 2.0               # ★ 预瞄时间常数提升至 2.0s，使横向修正更平滑，消除控制震荡
       rotate_to_heading_angular_vel: 1.0
       use_velocity_scaled_lookahead_dist: true
       min_approach_linear_velocity: 0.05        # 接近目标时的最小爬行速度
