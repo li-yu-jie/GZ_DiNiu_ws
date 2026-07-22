@@ -41,25 +41,24 @@ amcl:
     odom_frame_id: odom
     pf_err: 0.05
     pf_z: 0.99
-    recovery_alpha_fast: 0.3            # ★ 提高至 0.3：丢失追踪时更激进地注入全局随机粒子，加速全局重定位收敛
-    recovery_alpha_slow: 0.001          # 慢速背景粒子注入
+    recovery_alpha_fast: 0.0            # ★ 关闭过度的随机粒子全局撒点 (原 0.3 会持续破坏粒子收敛点导致定位跳变漂移)
+    recovery_alpha_slow: 0.0            # 关闭慢速散布，保持粒子束紧密聚拢在匹配点
     resample_interval: 1
     # ⚠️ 差速运动模型：Tricycle 无严格匹配的 AMCL 模型，用差速模型近似（转向角受限，够用）
     robot_model_type: nav2_amcl::DifferentialMotionModel
     save_pose_rate: 0.5
     set_initial_pose: false              # 不强制使用固定初始位姿；模式 A-2 首次需通过 RViz 2D Pose Estimate 给出粗位姿
     sigma_hit: 0.15                     # ★ 收紧至 0.15：激光命中模型更严格，提高场景匹配精度，减少粒子漂移
-    update_min_d: 0.10                   # ★ 提高至 0.10m：必须真实移动 10cm 才触发 AMCL 更新，屏蔽 Fast-LIO/IMU 静止时的微量噪声漂移
-    update_min_a: 0.10                   # ★ 提高至 0.10rad（约 6°）：必须真实转动才触发更新，防止角度噪声触发静止时错误更新
+    update_min_d: 0.05                   # ★ 0.05m：平滑敏捷跟进位姿更新
+    update_min_a: 0.05                   # ★ 0.05rad：旋转跟进更新
     # 观测模型权重：hit(命中)/short(意外近-人体)/max(超程)/rand(随机)
-    z_hit: 0.70                          # ★ 调整权重，避免人体强行拖拽粒子群导致位置偏斜
+    z_hit: 0.85                          # ★ 主权重提升至 0.85，强力锁定墙壁与真实地图特征
     z_max: 0.05
-    z_rand: 0.02                        # ★ 降低随机噪声权重，减少随机观测对粒子分布的干扰
-    z_short: 0.18                        # 人体/动态障碍物容差权重
+    z_rand: 0.05                        # 标准随机观测容差
+    z_short: 0.05                        # 障碍物容差
     scan_topic: scan_filtered
-    # ★ 禁用定时强制更新！1.0s 强制更新会在静止时把 Fast-LIO IMU 微量噪声误判为移动，持续触发粒子漂移！
-    # 现在只在机器人真实移动（update_min_d/a 阈值）时更新，彻底消除静止漂移
-    time_to_update_particle_filter: 3600.0  # 1小时强制一次，等同于禁用
+    # 禁用时间触发更新，仅在平移或旋转达到 update_min 阈值时更新 AMCL 粒子，彻底防止静止漂移
+    time_to_update_particle_filter: 0.0
 
 # ---------- 行为树导航器：统筹 规划→控制→恢复 的完整导航任务流 ----------
 bt_navigator:

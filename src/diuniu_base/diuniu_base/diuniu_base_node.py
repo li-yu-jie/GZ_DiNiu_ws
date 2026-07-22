@@ -217,18 +217,7 @@ class DiuNiuBaseNode(Node):
             if alpha_deg > 75.0: alpha_deg = 75.0
             if alpha_deg < -75.0: alpha_deg = -75.0
 
-            # 转向电机打角前馈与动态协调 (MCU Steering Lead)
-            delta_alpha = abs(alpha_deg - self.last_sent_alpha)
-            if delta_alpha > 25.0:
-                # 仅在弯道剧烈打角（>25°）时触发前馈超频与降速配合，直道微调完全不干预
-                alpha_lead = self.last_sent_alpha + 1.35 * (alpha_deg - self.last_sent_alpha)
-                if alpha_lead > 95.0: alpha_lead = 95.0
-                if alpha_lead < -95.0: alpha_lead = -95.0
-                alpha_deg = alpha_lead
-                v_front = v * 0.8  # 仅在直角弯打角瞬态微调车速
-            else:
-                v_front = v
-
+            v_front = v
             self.last_sent_alpha = alpha_deg
             
         # 只有在小车在运动、或者看门狗没有触发（手柄/导航发布中）时才限速打印日志
