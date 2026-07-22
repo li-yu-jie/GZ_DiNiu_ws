@@ -218,7 +218,7 @@ local_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 8.0          # ★ 指数极速衰减，确保通道中央为零代价，最大化物理可通过空间
         inflation_radius: 0.35          # ★ 局部定位与防撞安全阈值设为 0.35m，与车宽半宽对齐，绝不报内切圆冲突错误！
-      always_send_full_costmap: true
+      always_send_full_costmap: false     # ★ 设为 false！只发布局部代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 全局代价地图：静态地图 + 实时障碍，供全局规划 ----------
 global_costmap:
@@ -255,7 +255,7 @@ global_costmap:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 2.0          # ★ 调小至 2.0（缓慢衰减），使墙壁外的代价梯度非常缓和地向外延伸，强迫路径往外弯走！
         inflation_radius: 0.35          # ★ 设为 0.35m，与车宽半宽对齐，保证窄门通行且绝不报起点碰撞错误！
-      always_send_full_costmap: true
+      always_send_full_costmap: false     # ★ 设为 false！只发布全局代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
 map_server:
