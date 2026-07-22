@@ -28,7 +28,6 @@ def generate_launch_description():
     pkg_livox = get_package_share_directory('livox_ros_driver2')
     pkg_fast_lio = get_package_share_directory('fast_lio')
     pkg_diuniu_base = get_package_share_directory('diuniu_base')
-    pkg_teleop = get_package_share_directory('betop_teleop')
 
     # 模式切换参数：默认使用 FAST-LIO + AMCL 地图匹配重定位
     use_relocalization = LaunchConfiguration('use_relocalization')
@@ -64,14 +63,7 @@ def generate_launch_description():
         }.items()
     )
 
-    # 4. 启动手柄遥控节点（自动加载 Joy 发布 + Twist 映射）
-    teleop_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_teleop, 'launch', 'diuniu_teleop_cmd_vel.launch.py')
-        )
-    )
-
-    # 5. 启动导航
+    # 4. 启动导航
     nav_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_diuniu_nav, 'launch', 'diuniu_nav.launch.py')
@@ -87,6 +79,5 @@ def generate_launch_description():
         livox_launch,
         fast_lio_launch,
         base_launch,
-        teleop_launch,
         nav_launch
     ])
