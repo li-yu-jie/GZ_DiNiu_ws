@@ -166,7 +166,7 @@ controller_server:
       approach_velocity_scaling_dist: 1.0       # 距目标 1.0m 内开始减速
       # 碰撞检测：减少前瞻预测时间，防止长车身在直角弯拐弯时把侧面墙壁投影误判为碰撞
       use_collision_detection: true
-      max_allowed_time_to_collision_up_to_carrot: 0.6 # ★ 从 1.5s 降至 0.6s，消除直角弯虚警卡死，只拦截车头正前方物理障碍物！
+      max_allowed_time_to_collision_up_to_carrot: 0.2 # ★ 降至 0.2s！过弯时车身转动导致 footprint 投影短暂掠过角落墙壁，0.6s 会持续虚报触发急停；0.2s 只检测车头正前方 5cm 内的真实硬障碍，彻底消除转弯虚警卡死
       # 规则化速度缩放：结合大预瞄与拐大向，弯道保持 0.25m/s 高速顺畅过弯
       use_regulated_linear_velocity_scaling: true
       regulated_linear_scaling_min_speed: 0.25   # ★ 弯道过弯速度提升至 0.25m/s (25cm/s)
