@@ -254,7 +254,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0          # 稍微缓和衰减，让墙壁代价延伸稍远，推开路径
-        inflation_radius: 0.65          # ★ 0.5→0.65m：过弯时把全局参考路径从内角墙壁推开 15cm，给车身留出物理通行间隙
+        inflation_radius: 0.95          # ★ 0.65→0.95m：再多推开 30cm，过弯时路径远离内墙角
       always_send_full_costmap: false     # ★ 设为 false！只发布全局代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
