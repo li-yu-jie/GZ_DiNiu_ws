@@ -254,3 +254,10 @@ Visualization Manager:
       Scale: 160
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz_default_plugins)
+Window Geometry:
+  Height: 1080
+  Width: 1920
+  X: 0
+  Y: 0
+  Hide Left Dock: false
+

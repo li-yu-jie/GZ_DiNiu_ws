@@ -135,6 +135,7 @@ class DiuNiuJoyPublisher(Node):
                         os.close(fd)
                     except Exception:
                         pass
+                time.sleep(1.0)
     def publish_joy(self):
         """定时发布 Joy 消息。"""
         with self._lock:
