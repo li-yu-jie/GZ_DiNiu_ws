@@ -217,7 +217,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 5.0          # ★ 指数快速衰减，确保通道中央为零代价
-        inflation_radius: 0.32          # ★ 膨胀半径优化为 0.32m，弯道有效通行宽度拓宽 26cm，彻底消除卡死！
+        inflation_radius: 0.30          # ★ 局部膨胀降至 0.30m，给控制器跟踪预留最大“呼吸空间”，杜绝任何弯道虚假碰撞卡死！
       always_send_full_costmap: true
 
 # ---------- 全局代价地图：静态地图 + 实时障碍，供全局规划 ----------
@@ -253,8 +253,8 @@ global_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除鬼影障碍物
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 5.0          # ★ 全局代价指数快速衰减
-        inflation_radius: 0.32          # ★ 全局膨胀半径同步设为 0.32m，保证路径规划通畅
+        cost_scaling_factor: 3.0          # ★ 适度衰减，使全局路径向通道中心线靠拢
+        inflation_radius: 0.55          # ★ 全局膨胀半径设为 0.55m，强迫全局路径在大范围拐弯时走外线、远离墙角！
       always_send_full_costmap: true
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
