@@ -155,7 +155,7 @@ controller_server:
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.4           # 期望线速度 0.4m/s（长车身重载，保守取值）
+      desired_linear_vel: 0.8           # 期望线速度设为 0.8m/s
       lookahead_dist: 1.6
       min_lookahead_dist: 0.8          # ★ 增大至 0.8m！彻底消除直道快速行驶时的“画龙”摆动，保持直线稳如磐石
       max_lookahead_dist: 2.5
@@ -217,7 +217,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 8.0          # ★ 指数极速衰减，确保通道中央为零代价，最大化物理可通过空间
-        inflation_radius: 0.30          # ★ 局部定位与防撞安全阈值维持在最紧凑的 0.30m
+        inflation_radius: 0.35          # ★ 局部定位与防撞安全阈值设为 0.35m，与车宽半宽对齐，绝不报内切圆冲突错误！
       always_send_full_costmap: true
 
 # ---------- 全局代价地图：静态地图 + 实时障碍，供全局规划 ----------
@@ -254,7 +254,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 8.0          # ★ 指数极速衰减，保证通道中央的大片零代价空间，让通道极大化开放
-        inflation_radius: 0.30          # ★ 还原全局膨胀半径至 0.30m，确保最狭窄通道也能 100% 规划通过！
+        inflation_radius: 0.35          # ★ 设为 0.35m，与车宽半宽对齐，保证窄门通行且绝不报起点碰撞错误！
       always_send_full_costmap: true
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
@@ -272,7 +272,7 @@ planner_server:
     GridBased:
       plugin: "nav2_smac_planner/SmacPlannerHybrid" # ★ 工业叉车 Hybrid-A* 运动学规划器
       downsample_costmap: true         # ★ 开启代价地图降采样（加速长距离路径搜索）
-      downsampling_factor: 3           # ★ 降采样因子为 3（从 5cm 降为 15cm 规划网格，计算量缩小 9 倍，极速处理 100m+ 长距离）
+      downsampling_factor: 2           # ★ 降采样因子设为 2（从 5cm 降为 10cm 规划网格，大幅提升狭窄通道规划连通性，防止误判堵塞）
       tolerance: 0.5
       allow_unknown: true
       max_iterations: 2000000
