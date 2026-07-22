@@ -232,7 +232,14 @@ global_costmap:
       transform_tolerance: 0.5
       robot_radius: 0.95
       footprint: "[[1.60, 0.35], [1.60, -0.35], [-0.30, -0.35], [-0.30, 0.35]]"  # 物理实际车身尺寸
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      # ★ keepout_filter 必须放在 inflation_layer 之前：禁区同样会被膨胀层外扩，彻底禁行
+      plugins: ["static_layer", "obstacle_layer", "keepout_filter", "inflation_layer"]
+      # ---------- Web 端禁区层（Keepout Filter）：由 filter_mask_server 发布 /keepout_filter_mask ----------
+      # mask 语义：黑色(占用)=禁区，白色(空闲)=正常通行；网页修图页绘制后热加载生效
+      keepout_filter:
+        plugin: "nav2_costmap_2d::KeepoutFilter"
+        enabled: true
+        filter_info_topic: "/costmap_filter_info"
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true   # 确保能收到 map_server 的 latched 地图

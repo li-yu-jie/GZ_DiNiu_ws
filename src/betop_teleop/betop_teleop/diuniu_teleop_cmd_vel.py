@@ -53,6 +53,9 @@ class DiuNiuTeleopCmdVel(Node):
         self.linear_deadband = self.get_parameter('linear_deadband').value
         self.angular_deadband = self.get_parameter('angular_deadband').value
 
+        self.declare_parameter('require_enable_button', False)
+        self.require_enable_button = self.get_parameter('require_enable_button').value
+
         self.get_logger().info("🚀 [话题控制手柄节点] 正在启动，发布至 /cmd_vel_joy 话题...")
         self.get_logger().info(f"配置参数: 最大线速={self.max_speed} m/s, 最大角速度={self.max_angular} rad/s")
 
@@ -112,9 +115,10 @@ class DiuNiuTeleopCmdVel(Node):
             self.cmd_vel_pub.publish(twist)
             return
 
-        # ── 保护 3：使能键（LB/RB 键）──────────────────
-        is_enabled = (len(msg.buttons) > self.enable_button
-                      and msg.buttons[self.enable_button] == 1)
+        # ── 保护 3：使能键（按需开启）──────────────────
+        is_enabled = True
+        if self.require_enable_button:
+            is_enabled = (len(msg.buttons) > self.enable_button and msg.buttons[self.enable_button] == 1)
 
         if is_enabled:
             # 读取摇杆
