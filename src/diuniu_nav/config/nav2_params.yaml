@@ -36,26 +36,26 @@ amcl:
     laser_min_range: -1.0
     laser_model_type: likelihood_field  # 似然场模型，室内结构化环境定位稳定
     max_beams: 120                       # 每次更新使用的激光束数由 60 提升至 120，显著增强稀疏特征环境下的定位精度                       # 每次更新使用的激光束数，越大越准但越耗 CPU
-    max_particles: 2000                 # 粒子数上下限：收敛精度和算力的平衡
-    min_particles: 500
+    max_particles: 5000                 # ★ 提高至 5000：更多粒子 → 更强特征稀疏环境下的定位稳定性
+    min_particles: 1000                 # ★ 提高至 1000：保证最少粒子数，防止粒子匮乏导致漂移
     odom_frame_id: odom
     pf_err: 0.05
     pf_z: 0.99
-    recovery_alpha_fast: 0.0
-    recovery_alpha_slow: 0.0
+    recovery_alpha_fast: 0.1            # ★ 启用快速恢复粒子注入！当扫描匹配突然变差（过弯/行人遮挡），立即向全局注入随机粒子帮助重定位，防止漂走
+    recovery_alpha_slow: 0.001          # ★ 慢速恢复：持续微量注入全局随机粒子作为背景探索，保证长时间运行不累积漂移
     resample_interval: 1
     # ⚠️ 差速运动模型：Tricycle 无严格匹配的 AMCL 模型，用差速模型近似（转向角受限，够用）
     robot_model_type: nav2_amcl::DifferentialMotionModel
     save_pose_rate: 0.5
     set_initial_pose: false              # 不强制使用固定初始位姿；模式 A-2 首次需通过 RViz 2D Pose Estimate 给出粗位姿
-    sigma_hit: 0.2
+    sigma_hit: 0.15                     # ★ 收紧至 0.15：激光命中模型更严格，提高场景匹配精度，减少粒子漂移
     update_min_d: 0.02                   # 平移 0.02m 高频平滑更新 AMCL 坐标
     update_min_a: 0.02                   # 旋转 0.02rad 高频平滑更新 AMCL 坐标
     # 观测模型权重：hit(命中)/short(意外近-人体)/max(超程)/rand(随机)
     z_hit: 0.70                          # ★ 调整权重，避免人体强行拖拽粒子群导致位置偏斜
     z_max: 0.05
-    z_rand: 0.05
-    z_short: 0.20                        # ★ 赋予人体/动态障碍物 20% 的容差权重，人站在面前定位依然稳如泰山
+    z_rand: 0.02                        # ★ 降低随机噪声权重，减少随机观测对粒子分布的干扰
+    z_short: 0.18                        # 人体/动态障碍物容差权重
     scan_topic: scan_filtered
     # 定时粒子更新：即使小车静止在目标点，也每隔 1.0 秒强制进行一次 AMCL 粒子滤波重定位更新，防止静止漂移
     time_to_update_particle_filter: 1.0
