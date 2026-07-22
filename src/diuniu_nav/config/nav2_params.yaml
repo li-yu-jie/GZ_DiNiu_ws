@@ -231,7 +231,7 @@ global_costmap:
       use_sim_time: false
       transform_tolerance: 0.5
       robot_radius: 0.95
-      footprint: "[[1.60, 0.35], [1.60, -0.35], [-0.30, -0.35], [-0.30, 0.35]]"
+      footprint: "[[1.60, 0.35], [1.60, -0.35], [-0.30, -0.35], [-0.30, 0.35]]"  # 物理实际车身尺寸
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
@@ -253,8 +253,8 @@ global_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除鬼影障碍物
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 1.2          # ★ 调小至 1.2，使代价下降更缓慢，代价坡度极其宽缓地向通道中央延伸，在无物理碰撞危险的前提下，提供最饱满的居中牵引力！
-        inflation_radius: 1.8           # ★ 0.38→1.8m！实测最窄通道宽1.7m/典型3.4m，1.8m 膨胀让两侧墙的代价坡度在通道中线交叠形成真正的深 V 谷底（0.38m 时通道中央是平坦零代价区，规划器无居中动力导致贴墙走）。代价只与离墙距离有关，增大半径不会封锁窄通道（1.7m 通道中线代价仅 ~110，远低于 253 致命值），配合 cost_penalty 8.0 强迫全局路径走中线、过弯自然切外弯
+        cost_scaling_factor: 3.5          # 标准衰减系数，形成稳定的代价梯度
+        inflation_radius: 0.5           # 0.5m 膨胀半径，确保路径离墙有足够间距，又不会封堵通道
       always_send_full_costmap: false     # ★ 设为 false！只发布全局代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
@@ -282,9 +282,9 @@ planner_server:
       analytic_expansion_max_length: 25.0 # ★ 增大最大解析长度至 25.0m，长距离直接解析连接，免去冗余搜索
       reverse_penalty: 2.1
       change_penalty: 0.5              # ★ 增大打角变化惩罚，让弯道过渡更平滑
-      non_straight_penalty: 1.8        # ★ 提高转向惩罚，迫使路径在弯道前尽量走直线直插弯心，实现拐大向外甩尾
-      cost_penalty: 3.8                # ★ 恢复至 3.8（安全范围，防止 A* 启发式过载超时导致无法规划路径）
-      minimum_turning_radius: 1.05        # ★ 调小至 1.05m（给予全局规划器更大的自由度，使其规划出的绿色路线能够远离内墙角，走外线过弯！）
+      non_straight_penalty: 1.2        # 转向惩罚
+      cost_penalty: 3.5                # 标准代价惩罚
+      minimum_turning_radius: 1.3        # 地牛叉车物理最小转弯半径 1.3m
       lookup_table_size: 20.0
       cache_obstacle_heuristic: false
       debug_visualizations: false
