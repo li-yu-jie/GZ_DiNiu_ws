@@ -194,6 +194,39 @@ def generate_launch_description():
         ]
     )
 
+    # ============ Web 端禁区层（两种模式都启动） ============
+    # 1. 禁区 mask 地图服务器：加载 keepout_mask.yaml，以 transient_local 发布 /keepout_filter_mask
+    #    （mask 语义：黑色=禁区，白色=可通行；网页修图后通过 /filter_mask_server/load_map 热加载）
+    keepout_yaml = os.path.join(pkg_nav, 'maps', 'keepout_mask.yaml')
+    filter_mask_server = Node(
+        package='nav2_map_server',
+        executable='map_server',
+        name='filter_mask_server',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time},
+                    {'yaml_filename': keepout_yaml},
+                    {'topic_name': 'keepout_filter_mask'},
+                    {'frame_id': 'map'}]
+    )
+    # 2. 禁区过滤器信息服务：向 global_costmap 的 keepout_filter 通告 mask 话题与换算系数
+    costmap_filter_info_server = Node(
+        package='nav2_map_server',
+        executable='costmap_filter_info_server',
+        name='costmap_filter_info_server',
+        output='screen',
+        parameters=[configured_params]
+    )
+    # 3. 独立生命周期管理器：自动激活上述两个节点（与模式 A/B 各自的管理器互不干扰）
+    lifecycle_manager_keepout = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_keepout',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time},
+                    {'autostart': True},
+                    {'node_names': ['filter_mask_server', 'costmap_filter_info_server']}]
+    )
+
     # ============ 3D 点云 → 2D 激光切片节点（两种模式都启动） ============
     # 将 FAST-LIO 输出的机体坐标系点云压扁成 2D LaserScan，供代价地图避障与 AMCL 使用
     pointcloud_to_laserscan = Node(
@@ -254,6 +287,9 @@ def generate_launch_description():
         ekf_node,
         bringup_with_amcl,
         bringup_without_amcl,
+        filter_mask_server,
+        costmap_filter_info_server,
+        lifecycle_manager_keepout,
         pointcloud_to_laserscan,
         laserscan_filter
     ])

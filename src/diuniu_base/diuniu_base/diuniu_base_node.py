@@ -146,9 +146,9 @@ class DiuNiuBaseNode(Node):
 
     def cmd_vel_joy_callback(self, msg):
         """
-        处理手柄下发的目标速度 (不支持原地自转，原地只打角不走车)
+        处理手柄下发的目标速度 (支持原地打角与驱动响应)
         """
-        self.update_cmd_vel(msg, allow_pure_rotation=False)
+        self.update_cmd_vel(msg, allow_pure_rotation=True)
 
     def update_cmd_vel(self, msg, allow_pure_rotation=False):
         # 1. 优先处理紧急停止 (通过 angular.x 通道传递)

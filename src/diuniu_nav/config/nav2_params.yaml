@@ -270,6 +270,17 @@ map_server:
     use_sim_time: false
     yaml_filename: ""
 
+# ---------- 禁区过滤器信息服务：向 global_costmap 的 keepout_filter 通告 mask 话题与换算系数 ----------
+# type: 0 = 禁区(Keepout)；filter_value = base + multiplier × mask占用值，黑色占用格(100) → 禁区
+costmap_filter_info_server:
+  ros__parameters:
+    use_sim_time: false
+    type: 0
+    filter_info_topic: "/costmap_filter_info"
+    mask_topic: "/keepout_filter_mask"
+    base: 0.0
+    multiplier: 1.0
+
 # ---------- 全局规划器：基于静态+实时代价地图搜索全局路径 ----------
 planner_server:
   ros__parameters:
