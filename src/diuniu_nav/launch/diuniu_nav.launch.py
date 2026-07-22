@@ -50,6 +50,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_amcl = LaunchConfiguration('use_amcl')
     use_relocalization = LaunchConfiguration('use_relocalization')
+    use_ekf = LaunchConfiguration('use_ekf')
+    ekf_config_file = os.path.join(pkg_nav, 'config', 'ekf.yaml')
 
     # ★ 自定义行为树（已移除 Spin 90° 恢复动作，防 Tricycle 伪原地自转扫墙/撞墙转圈）
     # bt_navigator 只会在 nav2_bt_navigator 自家目录解析相对文件名，
@@ -82,6 +84,20 @@ def generate_launch_description():
         'use_relocalization',
         default_value='false',
         description='true=在模式A中启动AMCL进行2D地图匹配重定位；false=模式A使用静态map→odom（需从建图原点启动）')
+    declare_use_ekf = DeclareLaunchArgument(
+        'use_ekf',
+        default_value='false',
+        description='true=启动 robot_localization 多源传感器 EKF 融合节点（轮式里程计 + FAST-LIO + IMU）')
+
+    # EKF 传感器融合节点
+    ekf_node = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_filter_node',
+        output='screen',
+        parameters=[ekf_config_file, {'use_sim_time': use_sim_time}],
+        condition=IfCondition(use_ekf)
+    )
 
     # 机器人状态发布节点：根据 URDF 发布 base_link 到各关节/传感器的静态 TF
     robot_state_publisher_node = Node(
@@ -233,7 +249,9 @@ def generate_launch_description():
         declare_use_sim_time,
         declare_use_amcl,
         declare_use_relocalization,
+        declare_use_ekf,
         robot_state_publisher_node,
+        ekf_node,
         bringup_with_amcl,
         bringup_without_amcl,
         pointcloud_to_laserscan,

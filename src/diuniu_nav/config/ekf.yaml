@@ -1,0 +1,64 @@
+# =============================================================================
+# ekf.yaml — 地牛叉车多源传感器融合配置 (robot_localization EKF)
+#
+# 融合传感器源：
+#   1. 轮式里程计 (/wheel_odom): 提供高频线速度 vx 和角速度 wz (静止时 0 噪声)
+#   2. FAST-LIO SLAM 里程计 (/odom): 提供空间 2D 厘米级位姿 (x, y) 和偏航角 yaw
+#   3. 板载 IMU (/imu/data): 提供高频偏航角速度与绝对姿态
+# =============================================================================
+ekf_filter_node:
+  ros__parameters:
+    frequency: 30.0                     # EKF 滤波融合输出频率 30Hz
+    sensor_timeout: 0.1
+    two_d_mode: true                    # 工业叉车平面二维运动模式 (z=0, roll=0, pitch=0)
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: true
+    debug: false
+
+    # 坐标系定义
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom                   # 发布 odom -> base_link TF
+
+    publish_tf: true                    # 由 EKF 统一发布融合后的 odom -> base_link TF
+
+    # ── 传感器 1: 底盘轮式里程计 (/wheel_odom) ────────────────────────────────
+    # 只融合线速度 vx 和角速度 wz，发挥其静止时 100% 零漂移的优势
+    odom0: /wheel_odom
+    odom0_config: [false, false, false,   # x, y, z
+                   false, false, false,   # roll, pitch, yaw
+                   true,  false, false,   # vx, vy, vz
+                   false, false, true,    # vroll, vpitch, vyaw
+                   false, false, false]   # ax, ay, az
+    odom0_queue_size: 10
+    odom0_nodelay: true
+    odom0_differential: false
+    odom0_relative: false
+
+    # ── 传感器 2: FAST-LIO SLAM 里程计 (/fast_lio_odom) ──────────────────────
+    # 融合全局位置 x, y 与偏航角 yaw，发挥 3D 空间高精定位优势
+    odom1: /odom
+    odom1_config: [true,  true,  false,   # x, y, z
+                   false, false, true,    # roll, pitch, yaw
+                   false, false, false,   # vx, vy, vz
+                   false, false, false,   # vroll, vpitch, vyaw
+                   false, false, false]   # ax, ay, az
+    odom1_queue_size: 10
+    odom1_nodelay: true
+    odom1_differential: false
+    odom1_relative: false
+
+    # ── 传感器 3: BNO085 / IMU (/imu/data) ─────────────────────────────────────
+    # 融合角速度 wz，辅助旋转平滑
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  false, false, true,     # vyaw
+                  false, false, false]
+    imu0_queue_size: 10
+    imu0_nodelay: true
+    imu0_differential: false
+    imu0_relative: false
