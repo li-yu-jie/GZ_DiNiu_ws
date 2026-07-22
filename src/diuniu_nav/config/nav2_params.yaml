@@ -156,10 +156,10 @@ controller_server:
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
       desired_linear_vel: 0.8           # 期望线速度设为 0.8m/s
-      lookahead_dist: 1.6
-      min_lookahead_dist: 0.8          # ★ 增大至 0.8m！彻底消除直道快速行驶时的“画龙”摆动，保持直线稳如磐石
-      max_lookahead_dist: 2.5
-      lookahead_time: 2.0               # ★ 预瞄时间常数提升至 2.0s，使横向修正更平滑，消除控制震荡
+      lookahead_dist: 2.0              # ★ 默认预瞄距离提高至 2.0m
+      min_lookahead_dist: 1.2          # ★ 最小预瞄距离增大至 1.2m！提供超高控制阻尼，阻断高速 0.8m/s 下的画龙摆动
+      max_lookahead_dist: 3.5          # ★ 最大预瞄距离增大至 3.5m
+      lookahead_time: 3.0               # ★ 预瞄时间常数提升至 3.0s，大幅缓和高速行驶时的转向响应，消除摆动
       rotate_to_heading_angular_vel: 1.0
       use_velocity_scaled_lookahead_dist: true
       min_approach_linear_velocity: 0.05        # 接近目标时的最小爬行速度
