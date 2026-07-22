@@ -19,11 +19,11 @@ amcl:
     use_sim_time: false
     # 运动模型噪声系数（α1~α5）：轮式里程计误差估计，越大粒子越发散
     # FAST-LIO 提供的 odom→base_link 精度较高，但保守起见保持中等噪声
-    alpha1: 0.2
-    alpha2: 0.2
-    alpha3: 0.2
-    alpha4: 0.2
-    alpha5: 0.2
+    alpha1: 0.05                        # ★ 调小运动模型噪声方差：FAST-LIO 精度高，不让粒子团无故扩散
+    alpha2: 0.05
+    alpha3: 0.05
+    alpha4: 0.05
+    alpha5: 0.05
     base_frame_id: base_link
     beam_skip_distance: 0.3              # ★ 缩紧至 0.3m！行人在车前移动时，离墙>30cm 的人体点云瞬间被 AMCL 剔除，防止运动中定位偏斜
     beam_skip_error_threshold: 0.8
@@ -41,7 +41,7 @@ amcl:
     odom_frame_id: odom
     pf_err: 0.05
     pf_z: 0.99
-    recovery_alpha_fast: 0.0            # ★ 关闭过度的随机粒子全局撒点 (原 0.3 会持续破坏粒子收敛点导致定位跳变漂移)
+    recovery_alpha_fast: 0.0            # ★ 关闭过度的随机粒子全局撒点
     recovery_alpha_slow: 0.0            # 关闭慢速散布，保持粒子束紧密聚拢在匹配点
     resample_interval: 1
     # ⚠️ 差速运动模型：Tricycle 无严格匹配的 AMCL 模型，用差速模型近似（转向角受限，够用）
@@ -49,16 +49,16 @@ amcl:
     save_pose_rate: 0.5
     set_initial_pose: false              # 不强制使用固定初始位姿；模式 A-2 首次需通过 RViz 2D Pose Estimate 给出粗位姿
     sigma_hit: 0.15                     # ★ 收紧至 0.15：激光命中模型更严格，提高场景匹配精度，减少粒子漂移
-    update_min_d: 0.05                   # ★ 0.05m：平滑敏捷跟进位姿更新
-    update_min_a: 0.05                   # ★ 0.05rad：旋转跟进更新
+    update_min_d: 0.02                   # ★ 0.02m：高精平滑跟进位姿更新
+    update_min_a: 0.02                   # ★ 0.02rad：高精旋转跟进更新
     # 观测模型权重：hit(命中)/short(意外近-人体)/max(超程)/rand(随机)
-    z_hit: 0.85                          # ★ 主权重提升至 0.85，强力锁定墙壁与真实地图特征
+    z_hit: 0.85                          # ★ 主权重 0.85，强力锁定墙壁与真实地图特征
     z_max: 0.05
     z_rand: 0.05                        # 标准随机观测容差
     z_short: 0.05                        # 障碍物容差
     scan_topic: scan_filtered
-    # 禁用时间触发更新，仅在平移或旋转达到 update_min 阈值时更新 AMCL 粒子，彻底防止静止漂移
-    time_to_update_particle_filter: 0.0
+    # 每 0.5 秒定期对齐 map->odom 坐标，锁定墙壁激光点云，彻底消除静止姿态漂移
+    time_to_update_particle_filter: 0.5
 
 # ---------- 行为树导航器：统筹 规划→控制→恢复 的完整导航任务流 ----------
 bt_navigator:
