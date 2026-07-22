@@ -172,9 +172,9 @@ controller_server:
       regulated_linear_scaling_min_speed: 0.25   # ★ 弯道过弯速度提升至 0.25m/s (25cm/s)
       regulated_linear_scaling_min_radius: 1.0   # 弯道曲率降速阈值
       use_cost_regulated_linear_velocity_scaling: true
-      cost_scaling_dist: 0.6
+      cost_scaling_dist: 0.8             # ★ 扩大探测距离至 0.8m，提早感知内墙壁的存在
       cost_scaling_gain: 10.0
-      inflation_cost_scaling_factor: 1.5         # ★ 调小至 1.5（允许更靠近膨胀区域），防止过度排斥导致弯道卡死
+      inflation_cost_scaling_factor: 3.5         # ★ 提高排斥系数至 3.5！当靠近内墙壁时，迫使 RPP 控制器主动往外弯（低代价区）打角偏航，实现物理切外弯！
       use_rotate_to_heading: false  # 禁用 RPP 原地自转对齐。防止长车身货叉在转弯时原地旋转扫墙导致避障卡死
       allow_reversing: false        # 禁止倒车（后向无雷达视野，安全风险）
 
@@ -217,7 +217,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 8.0          # ★ 指数极速衰减，确保通道中央为零代价，最大化物理可通过空间
-        inflation_radius: 0.35          # ★ 局部定位与防撞安全阈值设为 0.35m，与车宽半宽对齐，绝不报内切圆冲突错误！
+        inflation_radius: 0.38          # ★ 局部定位与防撞安全阈值设为 0.38m，提供 3cm 缓冲，彻底杜绝起点碰撞与刮擦！
       always_send_full_costmap: false     # ★ 设为 false！只发布局部代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 全局代价地图：静态地图 + 实时障碍，供全局规划 ----------
@@ -254,7 +254,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 2.0          # ★ 调小至 2.0（缓慢衰减），使墙壁外的代价梯度非常缓和地向外延伸，强迫路径往外弯走！
-        inflation_radius: 0.35          # ★ 设为 0.35m，与车宽半宽对齐，保证窄门通行且绝不报起点碰撞错误！
+        inflation_radius: 0.38          # ★ 设为 0.38m，提供 3cm 额外车宽物理保护，强制全局参考路径避开墙壁！
       always_send_full_costmap: false     # ★ 设为 false！只发布全局代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
