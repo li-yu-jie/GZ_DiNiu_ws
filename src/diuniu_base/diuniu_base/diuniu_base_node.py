@@ -212,9 +212,9 @@ class DiuNiuBaseNode(Node):
             alpha_rad = math.atan((w * self.wheelbase) / v)
             alpha_deg = math.degrees(alpha_rad)
             
-            # 软件物理限角保护限制在 [-95°, +95°] 内
-            if alpha_deg > 95.0: alpha_deg = 95.0
-            if alpha_deg < -95.0: alpha_deg = -95.0
+            # 行驶状态下限制最大打角为 75.0°，防止前轮完全垂直横置导致前进起步憋死电机、原地打滑或机械顿卡！
+            if alpha_deg > 75.0: alpha_deg = 75.0
+            if alpha_deg < -75.0: alpha_deg = -75.0
 
             # 转向电机打角前馈与动态协调 (MCU Steering Lead)
             delta_alpha = abs(alpha_deg - self.last_sent_alpha)
