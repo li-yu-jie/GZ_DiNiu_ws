@@ -253,7 +253,7 @@ global_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除鬼影障碍物
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 8.0          # ★ 指数极速衰减，保证通道中央的大片零代价空间，让通道极大化开放
+        cost_scaling_factor: 2.0          # ★ 调小至 2.0（缓慢衰减），使墙壁外的代价梯度非常缓和地向外延伸，强迫路径往外弯走！
         inflation_radius: 0.35          # ★ 设为 0.35m，与车宽半宽对齐，保证窄门通行且绝不报起点碰撞错误！
       always_send_full_costmap: true
 
