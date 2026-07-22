@@ -146,9 +146,9 @@ class DiuNiuBaseNode(Node):
 
     def cmd_vel_joy_callback(self, msg):
         """
-        处理手柄下发的目标速度 (支持原地打角与驱动响应)
+        处理手柄下发的目标速度 (不支持原地自转，原地只打角不走车)
         """
-        self.update_cmd_vel(msg, allow_pure_rotation=True)
+        self.update_cmd_vel(msg, allow_pure_rotation=False)
 
     def update_cmd_vel(self, msg, allow_pure_rotation=False):
         # 1. 优先处理紧急停止 (通过 angular.x 通道传递)
@@ -200,7 +200,7 @@ class DiuNiuBaseNode(Node):
             if allow_pure_rotation and abs(w) >= 0.05:
                 # 绕后轴中心自转：前轮垂直（打角 90度），前轮线速度为 |w| * L
                 alpha_deg = 90.0 if w > 0 else -90.0
-                v_front = abs(w) * self.wheelbase
+                v_front = min(abs(w) * self.wheelbase, 1.2)  # 限幅：原地自转前轮速度不超过最大线速度
             else:
                 # 原地只打角不走车
                 v_front = 0.0
@@ -308,7 +308,11 @@ class DiuNiuBaseNode(Node):
         self.last_time = current_time
 
         # 1. dt 异常拦截 (防开机首帧大 dt 冲激)
-        if dt <= 0.0 or dt > 0.5:
+        if dt <= 0.0 or dt > 1.0:
+            if dt > 1.0:
+                self.get_logger().warn(
+                    f"⚠️ [里程计] 检测到异常 dt={dt:.3f}s（串口卡顿/调度延迟），本帧位移被丢弃",
+                    throttle_duration_sec=2.0)
             dt = 0.0
 
         # 2. 中点弧线积分 (Midpoint Runge-Kutta 2nd Order Integration)

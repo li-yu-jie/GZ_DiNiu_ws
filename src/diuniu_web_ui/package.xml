@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>diuniu_web_ui</name>
+  <version>1.0.0</version>
+  <description>地牛叉车 Web 控制端：建图/导航/导航点/修图(含禁区)/传感器面板，替代 RViz</description>
+  <maintainer email="lyj@example.com">LYJ</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>rosbridge_server</exec_depend>
+  <exec_depend>diuniu_nav</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

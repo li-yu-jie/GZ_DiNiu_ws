@@ -37,6 +37,13 @@ def generate_launch_description():
         description='true=模式一 B（FAST-LIO + AMCL 地图匹配）；false=模式一 A（静态原点）'
     )
 
+    use_ekf = LaunchConfiguration('use_ekf')
+    declare_use_ekf = DeclareLaunchArgument(
+        'use_ekf',
+        default_value='false',
+        description='true=开启 EKF 多源融合（此时关闭 FAST-LIO 的 TF 广播，由 EKF 统一发布 odom->base_link TF）'
+    )
+
     # 1. 启动 Mid360 雷达驱动
     livox_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -44,12 +51,15 @@ def generate_launch_description():
         )
     )
 
-    # 2. 启动 FAST-LIO SLAM（不自动打开 RViz）
+    # 2. 启动 FAST-LIO SLAM（当开启 EKF 时关闭 FAST-LIO 自身的 TF 广播，由 EKF 统一发布）
     fast_lio_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_fast_lio, 'launch', 'mapping.launch.py')
         ),
-        launch_arguments={'rviz': 'false'}.items()
+        launch_arguments={
+            'rviz': 'false',
+            'publish_tf': 'false' if use_ekf == 'true' else 'true'
+        }.items()
     )
 
     # 3. 启动底盘驱动
@@ -70,12 +80,14 @@ def generate_launch_description():
         ),
         launch_arguments={
             'use_amcl': 'false',
-            'use_relocalization': use_relocalization
+            'use_relocalization': use_relocalization,
+            'use_ekf': use_ekf
         }.items()
     )
 
     return LaunchDescription([
         declare_use_relocalization,
+        declare_use_ekf,
         livox_launch,
         fast_lio_launch,
         base_launch,

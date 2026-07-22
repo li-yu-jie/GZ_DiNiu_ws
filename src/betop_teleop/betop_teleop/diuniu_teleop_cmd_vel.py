@@ -53,7 +53,7 @@ class DiuNiuTeleopCmdVel(Node):
         self.linear_deadband = self.get_parameter('linear_deadband').value
         self.angular_deadband = self.get_parameter('angular_deadband').value
 
-        self.declare_parameter('require_enable_button', False)
+        self.declare_parameter('require_enable_button', True)
         self.require_enable_button = self.get_parameter('require_enable_button').value
 
         self.get_logger().info("🚀 [话题控制手柄节点] 正在启动，发布至 /cmd_vel_joy 话题...")

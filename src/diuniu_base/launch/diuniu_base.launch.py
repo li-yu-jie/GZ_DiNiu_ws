@@ -16,7 +16,7 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'port',
-            default_value='/dev/ttyUSB0',
+            default_value='/dev/ttyACM0',
             description='底盘串口设备路径'
         ),
         DeclareLaunchArgument(

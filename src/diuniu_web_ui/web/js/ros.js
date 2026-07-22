@@ -55,6 +55,15 @@ window.App = window.App || {};
   }
   App.on('ros-connected', () => { subs.forEach(bindSub); });
 
+  // 重新订阅某话题：latched(transient_local) 话题（如 /map）只在新订阅时推送，
+  // 建图→导航切换后必须重订阅才能拿到新地图
+  App.resubscribe = function (topicName) {
+    subs.filter(s => s.topic === topicName).forEach(e => {
+      if (e.topicObj) { try { e.topicObj.unsubscribe(); } catch (err) {} }
+      if (connected) bindSub(e);
+    });
+  };
+
   // ---- 常用话题便捷订阅 ----
   App.setupRosTopics = function () {
     // 地图（transient_local，连上就会收到一次）
@@ -67,24 +76,9 @@ window.App = window.App || {};
     App.subscribe('/plan', 'nav_msgs/msg/Path', m => App.emit('plan', m));
     // IMU
     App.subscribe('/imu/data', 'sensor_msgs/msg/Imu', m => App.emit('imu', m), 500);
-  };
-
-  // ---- TF：map -> base_link 机器人位姿，10Hz ----
-  App.setupTF = function () {
-    function makeTF() {
-      if (!connected) return;
-      const tf = new ROSLIB.TFClient({
-        ros: ros, fixedFrame: 'map', angularThres: 0.01, transThres: 0.01, rate: 10
-      });
-      tf.subscribe('base_link', function (msg) {
-        const q = msg.rotation;
-        const yaw = Math.atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z));
-        App.emit('pose', { x: msg.translation.x, y: msg.translation.y, yaw: yaw });
-      });
-      App._tf = tf;
-    }
-    App.on('ros-connected', makeTF);
-    makeTF();
+    // AMCL 位姿（map 系机器人位姿；模式 A-2 重定位由 AMCL 发布）
+    App.subscribe('/amcl_pose', 'geometry_msgs/msg/PoseWithCovarianceStamped',
+                  m => App.emit('amcl_pose', m.pose.pose), 200);
   };
 
   // ---- 发布器 ----

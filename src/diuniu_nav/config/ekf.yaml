@@ -9,7 +9,7 @@
 ekf_filter_node:
   ros__parameters:
     frequency: 30.0                     # EKF 滤波融合输出频率 30Hz
-    sensor_timeout: 0.1
+    sensor_timeout: 0.5
     two_d_mode: true                    # 工业叉车平面二维运动模式 (z=0, roll=0, pitch=0)
     transform_time_offset: 0.0
     transform_timeout: 0.0
@@ -37,8 +37,8 @@ ekf_filter_node:
     odom0_differential: false
     odom0_relative: false
 
-    # ── 传感器 2: FAST-LIO SLAM 里程计 (/fast_lio_odom) ──────────────────────
-    # 融合全局位置 x, y 与偏航角 yaw，发挥 3D 空间高精定位优势
+    # ── 传感器 2: FAST-LIO SLAM 里程计 ──────────────────────────────────────
+    # FAST-LIO 原始发布 /Odometry，mapping.launch.py 已 remap 为 /odom
     odom1: /odom
     odom1_config: [true,  true,  false,   # x, y, z
                    false, false, true,    # roll, pitch, yaw
