@@ -285,7 +285,7 @@ planner_server:
       non_straight_penalty: 1.8        # ★ 提高转向惩罚，迫使路径在弯道前尽量走直线直插弯心，实现拐大向外甩尾
       cost_penalty: 8.0                # ★ 代价权重暴增至 8.0！迫使路径极其敏感于任何墙壁代价，只走零代价的通道中线
       cost_power: 3.0                  # ★ 代价指数放大至 3.0！让贴墙代价呈立方级爆炸，彻底根除靠墙走的倾向
-      minimum_turning_radius: 1.3        # 地牛叉车前轮 90° 打角，最小转弯半径 1.3m
+      minimum_turning_radius: 1.05        # ★ 调小至 1.05m（给予全局规划器更大的自由度，使其规划出的绿色路线能够远离内墙角，走外线过弯！）
       lookup_table_size: 20.0
       cache_obstacle_heuristic: false
       debug_visualizations: false
