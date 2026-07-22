@@ -216,8 +216,8 @@ local_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除离开的动态/虚假障碍物！
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 5.0          # ★ 指数快速衰减，确保通道中央为零代价
-        inflation_radius: 0.30          # ★ 局部膨胀降至 0.30m，给控制器跟踪预留最大“呼吸空间”，杜绝任何弯道虚假碰撞卡死！
+        cost_scaling_factor: 8.0          # ★ 指数极速衰减，确保通道中央为零代价，最大化物理可通过空间
+        inflation_radius: 0.30          # ★ 局部定位与防撞安全阈值维持在最紧凑的 0.30m
       always_send_full_costmap: true
 
 # ---------- 全局代价地图：静态地图 + 实时障碍，供全局规划 ----------
@@ -253,8 +253,8 @@ global_costmap:
           inf_is_valid: true            # ★ 允许 +inf 射线穿透清除鬼影障碍物
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        cost_scaling_factor: 3.0          # ★ 适度衰减，使全局路径向通道中心线靠拢
-        inflation_radius: 0.55          # ★ 全局膨胀半径设为 0.55m，强迫全局路径在大范围拐弯时走外线、远离墙角！
+        cost_scaling_factor: 8.0          # ★ 指数极速衰减，保证通道中央的大片零代价空间，让通道极大化开放
+        inflation_radius: 0.30          # ★ 还原全局膨胀半径至 0.30m，确保最狭窄通道也能 100% 规划通过！
       always_send_full_costmap: true
 
 # ---------- 地图服务器：加载 2D 栅格地图（yaml 路径由 launch 参数传入） ----------
@@ -281,9 +281,10 @@ planner_server:
       analytic_expansion_ratio: 5.0    # 增大解析膨胀比例，加速末端 Reeds-Shepp 曲线收敛
       analytic_expansion_max_length: 25.0 # ★ 增大最大解析长度至 25.0m，长距离直接解析连接，免去冗余搜索
       reverse_penalty: 2.1
-      change_penalty: 0.1
-      non_straight_penalty: 1.2
-      cost_penalty: 2.0
+      change_penalty: 0.5              # ★ 增大打角变化惩罚，让弯道过渡更平滑
+      non_straight_penalty: 1.8        # ★ 提高转向惩罚，迫使路径在弯道前尽量走直线直插弯心，实现拐大向外甩尾
+      cost_penalty: 3.5                # ★ 提高障碍物代价惩罚，迫使路径极力偏向通道零代价的几何中心线
+      cost_power: 2.0                  # ★ 代价指数放大，加剧贴墙排斥力，让路径在大宽度内自动选择走中线
       minimum_turning_radius: 1.3        # 地牛叉车前轮 90° 打角，最小转弯半径 1.3m
       lookup_table_size: 20.0
       cache_obstacle_heuristic: false
