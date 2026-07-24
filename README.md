@@ -22,7 +22,7 @@
    - **TF 广播解耦**：FAST-LIO C++ 节点扩展了 `publish.tf_en` 参数。开启 EKF（`use_ekf:=true`）时，系统自动关闭 FAST-LIO 的 `odom → base_link` TF 广播，改由 EKF 统一广播融合后的坐标变换，彻底解耦 TF 重复广播冲突。
 
 3. **雷达自身阴影与前货叉三维空间过滤器（`laserscan_filter`）**：
-   - **精确尺寸对齐**：雷达位于 `base_link` 前方 $1.215\text{m}$，前货叉最前端为 $1.60\text{m}$。过滤器 `laserscan_filter` 的过滤区域严格设为 $x \in [-0.25, 1.60]\text{m}$、y \in [-0.35, 0.35]\text{m}$，与 `nav2_params.yaml` 中全局/局部代价地图的物理 `footprint` 前边界 $1.60\text{m}$ 完全一致，彻底去除了货叉尖端的自扫噪点，消除了 AMCL 重定位的静态点云污染。
+   - **精确尺寸对齐**：雷达位于 `base_link` 前方 $1.215\text{m}$，前货叉最前端为 $1.60\text{m}$。过滤器 `laserscan_filter` 的过滤区域严格设为 $x \in [-0.25, 1.60]\text{m}$、$y \in [-0.35, 0.35]\text{m}$，与 `nav2_params.yaml` 中全局/局部代价地图的物理 `footprint` 前边界 $1.60\text{m}$ 完全一致，彻底去除了货叉尖端的自扫噪点，消除了 AMCL 重定位的静态点云污染。
    - **地面噪点排除**：点云切片高度下限设为地面以上 10 厘米（`min_height: 0.10`，上限 `max_height: 1.2`），避免地板反光噪点引发的虚假障碍物。
 
 4. **手柄遥控安全逻辑与物理限幅**：
@@ -105,6 +105,29 @@ ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py
 * **安全控制**：按住 **RT 键**（使能键）的同时推动摇杆：左摇杆控制前进/后退，右摇杆控制转向。
 * **升降货叉**：**LB 键** 上升，**A 键** 下降。
 * **紧急停止**：按下 **B 键** 触发底盘硬件断电急停。
+
+---
+
+## 🖥️ 启动 RViz2 可视化界面
+
+在新的终端窗口中运行以下命令启动配备全屏配置的可视化界面：
+
+```bash
+cd ~/GZ_DiNiu_ws
+source install/setup.bash
+ros2 run rviz2 rviz2 -d src/diuniu_nav/rviz/diuniu_nav.rviz
+```
+
+*(若已被安装部署，也可使用：`ros2 run rviz2 rviz2 -d install/diuniu_nav/share/diuniu_nav/rviz/diuniu_nav.rviz`)*
+
+### 交互与操作指南：
+1. **重定位对齐（针对 AMCL 模式）**：
+   - 点击界面顶部的 **`2D Pose Estimate`** 按钮。
+   - 在地图上点击小车两后轮中心连线中点（`base_link`），按住左键拖拽拖出小车车头方向并松开。
+   - 控制小车微调前后移动，激光雷达点云与 2D 地图墙壁将完成精准吸附。
+2. **发布导航目标点**：
+   - 点击界面顶部的 **`2D Goal Pose`** 按钮。
+   - 在地图目标位置点击并拖拽生成朝向箭头，Nav2 会自动规划路径并驱动小车行驶。
 
 ---
 
