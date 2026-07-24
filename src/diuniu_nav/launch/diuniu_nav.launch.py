@@ -239,7 +239,7 @@ def generate_launch_description():
         ],
         parameters=[{
             'target_frame': 'base_link',
-            'transform_tolerance': 0.05,
+            'transform_tolerance': 0.2,   # ★ 放宽至 0.2s：FAST-LIO 10Hz 发布时自然抖动 ~100ms，0.05s 容忍度过严导致频繁丢帧警告
             'min_height': 0.10,       # ★ 设为 10cm！全面捕捉前方人体脚踝、鞋子与低矮障碍物，绝不漏扫撞人
             'max_height': 1.2,        # 切片上限 1.2m，覆盖常见货架/人腿高度
             'angle_min': -3.1415926,  # 全周 360° 扫描

@@ -20,7 +20,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 
 
 def generate_launch_description():
@@ -52,13 +52,15 @@ def generate_launch_description():
     )
 
     # 2. 启动 FAST-LIO SLAM（当开启 EKF 时关闭 FAST-LIO 自身的 TF 广播，由 EKF 统一发布）
+    # ⚠️ publish_tf 使用 PythonExpression 在 launch 运行时动态求值，
+    #    不能用 Python == 比较 LaunchConfiguration 对象（对象比较永远为 False）
     fast_lio_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(pkg_fast_lio, 'launch', 'mapping.launch.py')
         ),
         launch_arguments={
             'rviz': 'false',
-            'publish_tf': 'false' if use_ekf == 'true' else 'true'
+            'publish_tf': PythonExpression(["'false' if '", use_ekf, "' == 'true' else 'true'"])
         }.items()
     )
 
