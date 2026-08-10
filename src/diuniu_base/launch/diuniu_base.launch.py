@@ -41,6 +41,12 @@ def generate_launch_description():
             description='Whether to publish odom topic'
         ),
 
+        DeclareLaunchArgument(
+            'steer_rate_limit_dps',
+            default_value='240.0',
+            description='转向角速率限制 (度/秒)，防止单周期满舵跳变'
+        ),
+
         Node(
             package='diuniu_base',
             executable='diuniu_base',
@@ -49,6 +55,7 @@ def generate_launch_description():
                 'serial_port': LaunchConfiguration('port'),
                 'baud_rate': LaunchConfiguration('baud'),
                 'wheelbase': LaunchConfiguration('wheelbase'),
+                'steer_rate_limit_dps': LaunchConfiguration('steer_rate_limit_dps'),
                 'pub_odom_tf': LaunchConfiguration('pub_odom_tf'),
                 'pub_odom_topic': LaunchConfiguration('pub_odom_topic'),
             }],

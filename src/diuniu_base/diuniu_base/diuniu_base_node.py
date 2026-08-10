@@ -33,6 +33,7 @@ class DiuNiuBaseNode(Node):
         self.declare_parameter('baud_rate', 460800)
         self.declare_parameter('wheelbase', 1.30)  # 物理轴距 L = 1.30m
         self.declare_parameter('max_angular_speed', 2.5) # 最大角速度参考值
+        self.declare_parameter('steer_rate_limit_dps', 240.0) # 转向角速率限制 (度/秒)，防单周期满舵跳变
         self.declare_parameter('pub_odom_tf', True)
         self.declare_parameter('pub_odom_topic', True)
         
@@ -40,6 +41,7 @@ class DiuNiuBaseNode(Node):
         self.baudrate = self.get_parameter('baud_rate').value
         self.wheelbase = self.get_parameter('wheelbase').value
         self.max_angular_speed = self.get_parameter('max_angular_speed').value
+        self.steer_rate_limit_dps = self.get_parameter('steer_rate_limit_dps').value
         self.pub_odom_topic = self.get_parameter('pub_odom_topic').value
         
         # ──────────────────────────────────────────
@@ -140,9 +142,11 @@ class DiuNiuBaseNode(Node):
 
     def cmd_vel_callback(self, msg):
         """
-        处理 Nav2 自主导航下发的目标速度 (支持原地自转)
+        处理 Nav2 自主导航下发的目标速度 (禁止原地自转)
+        ★ 行为树已移除 Spin、RPP 已禁 use_rotate_to_heading，Nav2 无任何合法纯旋转输出；
+        关闭 ±90° 伪自转分支，消除启动瞬间/异常帧前轮满舵扫掠风险
         """
-        self.update_cmd_vel(msg, allow_pure_rotation=True)
+        self.update_cmd_vel(msg, allow_pure_rotation=False)
 
     def cmd_vel_joy_callback(self, msg):
         """
@@ -218,7 +222,15 @@ class DiuNiuBaseNode(Node):
             if alpha_deg < -75.0: alpha_deg = -75.0
 
             v_front = v
-            self.last_sent_alpha = alpha_deg
+
+        # 3. 转向角速率限制：每周期最大变化量 = 速率上限 × 定时器周期(0.05s)
+        #    杜绝 Nav2 角速度阶跃/AMCL 位姿跳变导致的单周期满舵左右猛打（手柄原地打角同样生效）
+        max_delta = self.steer_rate_limit_dps * 0.05
+        if alpha_deg > self.last_sent_alpha + max_delta:
+            alpha_deg = self.last_sent_alpha + max_delta
+        elif alpha_deg < self.last_sent_alpha - max_delta:
+            alpha_deg = self.last_sent_alpha - max_delta
+        self.last_sent_alpha = alpha_deg
             
         # 只有在小车在运动、或者看门狗没有触发（手柄/导航发布中）时才限速打印日志
         if abs(v_front) > 0.01 or abs(alpha_deg) > 1.0 or dt <= 0.2:
