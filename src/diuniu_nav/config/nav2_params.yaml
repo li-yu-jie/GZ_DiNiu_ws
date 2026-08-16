@@ -173,7 +173,7 @@ controller_server:
       stateful: true                    # ★ 必须保持 true：xy 一旦满足即锁存，之后只盯 yaw，防位姿抖动反复
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.40
-      yaw_goal_tolerance: 0.052         # ★ 3° = 0.052rad：插货对位硬指标，勿放宽；叉车对货架时超 3° 叉尖横向偏差 >12cm/m 进深
+      yaw_goal_tolerance: 0.0175        # ★ 1° = 0.0175rad：插货极致精度收紧
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
@@ -338,22 +338,17 @@ planner_server:
       max_on_approach_iterations: 10000 # 增大逼近迭代上限
       max_planning_time: 5.0           # 最大容许规划时间放宽至 5.0s，防止超时退出
       analytic_expansion_ratio: 5.0    # 增大解析膨胀比例，加速末端 Reeds-Shepp 曲线收敛
-      # ★ 25.0→5.0m！解析膨胀 = 直接用一条 Reeds-Shepp 泊车曲线连接当前位姿到终点，
-      #    25m 时全场都在"泊车模式"射程内，RS 曲线几何上划算就安排起步倒车甩头（penalty 压不住）；
-      #    限到 5m 后泊车曲线只出现在目标点附近微调区，远场走前向晶格搜索，起步不再倒车。
-      #    代价：长距离规划少了一条捷径，max_planning_time 5.0s + max_iterations 200万兜底够用
-      analytic_expansion_max_length: 5.0
+      # ★ 限到 2.0m！解析膨胀 = 直接用一条 Reeds-Shepp 泊车曲线连接当前位姿到终点，
+      #    5m 时全场都在"泊车模式"射程内，容易生成折角/尖尖（V字换向段）；
+      #    限到 2.0m 结合大 change_penalty 彻底消灭末端尖尖/V字换向折线。
+      analytic_expansion_max_length: 2.0
       # ★ REEDS_SHEPP（允许倒车段）：插货对位需要倒车修正能力（汽车泊车原理）
-      # ★ reverse_penalty=20：倒车成本 = 距离×20，倒车经济阈值 ≈ 0.5m——只有近点
-      #    微调（插货对位拧航向）才划算，中长途永远规划前进绕行。
-      #    ⚠️ 2.1 时代规划器会直接安排长途倒车段起步，后向感知受限极其危险，勿回调！
-      #    ⚠️ 已确认业务底线：保到点 3° 航向精度，容忍 ≤0.5m 量级的微调倒车（含起步）；
-      #      三轮禁自转，到位后修航向只有"倒车拧"和"绕 1.3m 大圈"两条路，无第三条
       motion_model_for_search: "REEDS_SHEPP"
       reverse_penalty: 20.0
-      change_penalty: 3.5              # ★ 提高至 3.5：严厉惩罚打角方向切换，彻底消灭全局规划在直道上的 S 形波浪折线！
+      change_penalty: 15.0             # ★ 提高至 15.0：重罚末端前进/后退频繁换向，消灭末端路径的"尖尖"(V字折线)！
       non_straight_penalty: 2.2        # ★ 提高至 2.2：重罚转向段，规划器偏好"先摆正车身再直穿门/直行道"，杜绝斜角进门导致叉尖扫门框的几何死局
       cost_penalty: 2.5                # ★ 折中 2.5：3.5 时窄走廊里逐个躲避墙包代价场导致路径蛇形、方向盘左右打；2.5 保留"开阔区绕外不抄近道"的效果，又不对微小代价噪点过度反应
+      use_final_approach_orientation: false # ★ 关键参数：末端路径不强行用 1.3m 转弯半径甩尾对齐目标角度（消灭路径末端"尖尖/勾子"），到点后靠 RPP 前轮 90° 原地自转对齐 1° 航向
       minimum_turning_radius: 1.3        # 地牛叉车物理最小转弯半径 1.3m
       lookup_table_size: 20.0
       cache_obstacle_heuristic: false
