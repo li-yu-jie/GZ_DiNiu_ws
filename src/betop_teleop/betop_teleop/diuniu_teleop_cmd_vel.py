@@ -65,6 +65,13 @@ class DiuNiuTeleopCmdVel(Node):
         self.latest_joy_msg = None
         self.last_joy_time = self.get_clock().now()
         self._joy_lock = threading.Lock()
+
+        # ★ 静默发布策略：只有"使能键按下/急停按下"才持续发布；
+        #    松开使能或信号丢失时只补发若干个全零帧（ZERO_BURST 次）然后彻底静默。
+        #    原因：底盘对 /cmd_vel 与 /cmd_vel_joy 做"手柄优先"仲裁（最近 0.5s 内有
+        #    手柄消息即屏蔽 Nav2），若手柄空闲时仍 20Hz 发全零帧，会永久锁死 Nav2 导航。
+        self._zero_burst_remaining = 0
+        self.ZERO_BURST = 5  # 补发 5 帧全零（20Hz 下 0.25s），确保底盘可靠收到停车指令
         
         # 创建 Twist 话题发布者
         self.cmd_vel_pub = self.create_publisher(Twist, 'cmd_vel_joy', 10)
@@ -94,13 +101,15 @@ class DiuNiuTeleopCmdVel(Node):
             return
 
         if ((now - last_time).nanoseconds / 1e9 > 0.5):
-            self.get_logger().warn("手柄信号丢失，发送安全停止话题！", throttle_duration_sec=3.0)
-            twist = Twist()
-            twist.linear.x = 0.0
-            twist.angular.z = 0.0
-            twist.linear.z = 0.0
-            twist.angular.x = 0.0  # 安全停止，非急停
-            self.cmd_vel_pub.publish(twist)
+            self.get_logger().warn("手柄信号丢失，补发安全停止后静默（底盘看门狗 0.2s 兜底停车）", throttle_duration_sec=3.0)
+            if self._zero_burst_remaining > 0:
+                self._zero_burst_remaining -= 1
+                twist = Twist()
+                twist.linear.x = 0.0
+                twist.angular.z = 0.0
+                twist.linear.z = 0.0
+                twist.angular.x = 0.0  # 安全停止，非急停
+                self.cmd_vel_pub.publish(twist)
             return
 
         msg = latest
@@ -151,19 +160,25 @@ class DiuNiuTeleopCmdVel(Node):
             twist.angular.x = 0.0      # 正常运行
             self.cmd_vel_pub.publish(twist)
 
+            # 活跃发布期间持续武装补发计数：一旦松开使能/信号丢失，补发若干全零帧后静默
+            self._zero_burst_remaining = self.ZERO_BURST
+
             # 限速打印调试信息
             self.get_logger().info(
                 f"[发送 Twist] Vx={target_speed:+.3f} m/s | Wz={target_w:+.3f} rad/s | Lift={lift_val:+.1f}",
                 throttle_duration_sec=0.5
             )
         else:
-            # 松开 LB 键，发送全零停止
-            twist = Twist()
-            twist.linear.x = 0.0
-            twist.angular.z = 0.0
-            twist.linear.z = 0.0
-            twist.angular.x = 0.0
-            self.cmd_vel_pub.publish(twist)
+            # 松开使能键：补发若干全零停止帧后彻底静默，把底盘控制权交还 Nav2
+            # （持续发全零会触发底盘"手柄优先"仲裁，永久屏蔽 Nav2 的 /cmd_vel）
+            if self._zero_burst_remaining > 0:
+                self._zero_burst_remaining -= 1
+                twist = Twist()
+                twist.linear.x = 0.0
+                twist.angular.z = 0.0
+                twist.linear.z = 0.0
+                twist.angular.x = 0.0
+                self.cmd_vel_pub.publish(twist)
 
     def destroy_node(self):
         self.get_logger().info("正在关闭话题控制手柄节点...")

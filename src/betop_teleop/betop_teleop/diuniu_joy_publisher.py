@@ -13,9 +13,29 @@ from rclpy.node import Node
 from sensor_msgs.msg import Joy
 import struct
 import os
+import re
 import select
 import threading
 import time
+
+
+def find_js_device_by_name(name_substr):
+    """按设备名在 /proc/bus/input/devices 中查找对应的 /dev/input/jsN 节点。
+
+    js0/js1 的编号按设备出现顺序分配（例如 NoMachine 远程桌面连接后会
+    抢占 js0），写死节点号不可靠，因此按名称匹配（如 'BTP-KP20D'）。
+    """
+    try:
+        with open('/proc/bus/input/devices', 'r', errors='ignore') as f:
+            content = f.read()
+    except OSError:
+        return None
+    for block in content.strip().split('\n\n'):
+        if name_substr.lower() in block.lower():
+            m = re.search(r'Handlers=.*?\b(js\d+)\b', block)
+            if m:
+                return '/dev/input/' + m.group(1)
+    return None
 
 
 class DiuNiuJoyPublisher(Node):
@@ -26,6 +46,7 @@ class DiuNiuJoyPublisher(Node):
         # 声明参数
         # ──────────────────────────────────────────
         self.declare_parameter('device', '/dev/input/js0')
+        self.declare_parameter('device_name', 'BTP-KP20D')
         self.declare_parameter('publish_rate', 50.0)
         self.declare_parameter('num_axes', 8)
         self.declare_parameter('num_buttons', 16)
@@ -34,12 +55,14 @@ class DiuNiuJoyPublisher(Node):
         # 读取参数
         # ──────────────────────────────────────────
         self.device = self.get_parameter('device').value
+        self.device_name = self.get_parameter('device_name').value
         self.publish_rate = self.get_parameter('publish_rate').value
         self.num_axes = self.get_parameter('num_axes').value
         self.num_buttons = self.get_parameter('num_buttons').value
 
         self.get_logger().info(
-            f'🎮 [Joy 发布节点] 设备={self.device}, 轴数={self.num_axes}, 按键数={self.num_buttons}'
+            f'🎮 [Joy 发布节点] 设备名匹配="{self.device_name}" (回退节点={self.device}), '
+            f'轴数={self.num_axes}, 按键数={self.num_buttons}'
         )
 
         # ──────────────────────────────────────────
@@ -60,23 +83,35 @@ class DiuNiuJoyPublisher(Node):
 
         self._open_device()
 
+    def _resolve_device(self):
+        """解析实际要打开的设备节点：优先按 device_name 匹配，失败则回退到 device 参数。"""
+        if self.device_name:
+            matched = find_js_device_by_name(self.device_name)
+            if matched:
+                return matched
+            self.get_logger().warn(
+                f'未找到名称包含 "{self.device_name}" 的手柄设备，回退到固定节点 {self.device}',
+                throttle_duration_sec=5.0)
+        return self.device
+
     def _open_device(self):
         """尝试打开并监听指定的 joystick 设备。"""
+        device = self._resolve_device()
         with self._fd_lock:
             if self._fd is not None:
                 return
             try:
-                self._fd = os.open(self.device, os.O_RDONLY | os.O_NONBLOCK)
+                self._fd = os.open(device, os.O_RDONLY | os.O_NONBLOCK)
             except OSError as e:
                 self._fd = None
-                self.get_logger().error(f'无法打开手柄设备 {self.device}: {e}')
+                self.get_logger().error(f'无法打开手柄设备 {device}: {e}')
                 return
 
         # 避免重复启动多个读取线程
         if self._ev_thread is None or not self._ev_thread.is_alive():
             self._ev_thread = threading.Thread(target=self._read_events, daemon=True)
             self._ev_thread.start()
-        self.get_logger().info(f'成功打开手柄设备: {self.device}')
+        self.get_logger().info(f'成功打开手柄设备: {device}')
 
     def _read_events(self):
         """后台线程：读取 Linux joystick 事件并更新轴/按键状态。"""

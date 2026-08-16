@@ -34,8 +34,10 @@ class DiuNiuBaseNode(Node):
         self.declare_parameter('wheelbase', 1.30)  # 物理轴距 L = 1.30m
         self.declare_parameter('max_angular_speed', 2.5) # 最大角速度参考值
         self.declare_parameter('steer_rate_limit_dps', 240.0) # 转向角速率限制 (度/秒)，防单周期满舵跳变
-        self.declare_parameter('pub_odom_tf', True)
-        self.declare_parameter('pub_odom_topic', True)
+        # 默认关闭自带里程计发布：实车由 FAST-LIO/EKF 提供 /odom 与 TF，双重发布会冲突；
+        # 仅无 SLAM 的纯底盘调试时才显式开启
+        self.declare_parameter('pub_odom_tf', False)
+        self.declare_parameter('pub_odom_topic', False)
         
         self.port_name = self.get_parameter('serial_port').value
         self.baudrate = self.get_parameter('baud_rate').value
@@ -89,6 +91,10 @@ class DiuNiuBaseNode(Node):
         self.allow_pure_rotation = False
         self.last_sent_alpha = 0.0
         self.last_cmd_time = self.get_clock().now()
+        # ★ 手柄接管仲裁：最近一次收到 /cmd_vel_joy 的时间。
+        #    手柄活跃期间（0.5s 内）忽略 Nav2 的 /cmd_vel，防止两路指令 20~50Hz 交错争抢底盘。
+        #    初始化为启动时刻，避免开机瞬间 Nav2 指令抢在手柄前生效。
+        self.last_joy_cmd_time = self.get_clock().now()
         self.cmd_send_timer = self.create_timer(0.05, self.cmd_send_timer_callback)
         
         self.get_logger().info("🚀 DiuNiu ROS 2 驱动节点已启动，正在监听底盘数据流...")
@@ -145,13 +151,24 @@ class DiuNiuBaseNode(Node):
         处理 Nav2 自主导航下发的目标速度 (禁止原地自转)
         ★ 行为树已移除 Spin、RPP 已禁 use_rotate_to_heading，Nav2 无任何合法纯旋转输出；
         关闭 ±90° 伪自转分支，消除启动瞬间/异常帧前轮满舵扫掠风险
+        ★ 手柄优先仲裁：最近 0.5s 内收到过 /cmd_vel_joy（手柄/Web 摇杆活跃）时，
+        忽略 Nav2 指令，防止两路指令 20~50Hz 交错争抢底盘导致车身抖动
         """
+        dt_joy = (self.get_clock().now() - self.last_joy_cmd_time).nanoseconds / 1e9
+        if dt_joy < 0.5:
+            self.get_logger().warn(
+                "🎮 [仲裁] 手柄/Web 摇杆活跃中，忽略 Nav2 /cmd_vel 指令",
+                throttle_duration_sec=2.0
+            )
+            return
         self.update_cmd_vel(msg, allow_pure_rotation=False)
 
     def cmd_vel_joy_callback(self, msg):
         """
         处理手柄下发的目标速度 (不支持原地自转，原地只打角不走车)
+        ★ 记录接收时间用于手柄优先仲裁（见 cmd_vel_callback）
         """
+        self.last_joy_cmd_time = self.get_clock().now()
         self.update_cmd_vel(msg, allow_pure_rotation=False)
 
     def update_cmd_vel(self, msg, allow_pure_rotation=False):

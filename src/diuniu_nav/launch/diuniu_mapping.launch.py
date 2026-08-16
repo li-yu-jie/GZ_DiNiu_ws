@@ -1,15 +1,16 @@
 # =============================================================================
-# diuniu_mapping.launch.py — 地牛叉车建图模式一键启动文件（Web 端建图使用）
+# diuniu_mapping.launch.py — 地牛叉车建图模式一键启动文件
 #
 # 启动组件：
 #   1. livox_ros_driver2 — Mid360 雷达驱动
 #   2. fast_lio — FAST-LIO SLAM（退出时自动落盘 PCD：src/FAST_LIO/PCD/scans.pcd）
 #   3. diuniu_base — 底盘驱动（关闭自身 odom TF/topic，避免与 FAST-LIO 冲突）
 #   4. robot_state_publisher — URDF 静态 TF
-#   5. pointcloud_to_laserscan + laserscan_filter — 供 Web 端实时显示干净激光
+#   5. pointcloud_to_laserscan + laserscan_filter — 输出干净的 /scan_filtered
 #
-# 与 diuniu_nav_all.launch.py 的区别：不启动 Nav2 / AMCL / map_server，
-# 建图期间网页用虚拟摇杆 (/cmd_vel_joy) 遥控，完成后由 Web 后端执行保存流水线。
+# 与 diuniu_nav_all.launch.py 的区别：不启动 Nav2 / AMCL / map_server。
+# 建图期间用手柄遥控（ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py），
+# 完成后 Ctrl+C 退出，FAST-LIO 自动将点云落盘为 PCD，再用 pcd2pgm 包转 2D 地图。
 #
 # 用法：
 #   ros2 launch diuniu_nav diuniu_mapping.launch.py
@@ -71,7 +72,7 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_desc, 'use_sim_time': use_sim_time}]
     )
 
-    # 5. 3D 点云 → 2D 激光切片（参数与 diuniu_nav.launch.py 保持一致）
+    # 5. 3D 点云 → 2D 激光切片（参数与 diuniu_nav.launch.py 保持一致，改动请两边同步）
     pointcloud_to_laserscan = Node(
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
@@ -82,7 +83,7 @@ def generate_launch_description():
         ],
         parameters=[{
             'target_frame': 'base_link',
-            'transform_tolerance': 0.05,
+            'transform_tolerance': 0.2,
             'min_height': 0.10,
             'max_height': 1.2,
             'angle_min': -3.1415926,
@@ -101,13 +102,14 @@ def generate_launch_description():
     )
 
     # 6. 雷达自遮挡过滤器：输出干净的 /scan_filtered 供 Web 端显示
+    #    参数与 diuniu_nav.launch.py 保持一致（x∈[-0.35, 1.60]，覆盖全局 footprint 含叉尖）
     laserscan_filter = Node(
         package='diuniu_base',
         executable='laserscan_filter',
         name='laserscan_filter',
         parameters=[{
-            'x_min': -0.25,
-            'x_max': 1.30,
+            'x_min': -0.35,
+            'x_max': 1.60,
             'y_min': -0.35,
             'y_max': 0.35,
             'laser_x_offset': 0.0,

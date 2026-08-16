@@ -25,7 +25,7 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch.conditions import UnlessCondition, IfCondition
 from nav2_common.launch import RewrittenYaml
@@ -64,6 +64,12 @@ def generate_launch_description():
         pkg_nav, 'behavior_trees', 'navigate_to_pose_w_replanning_and_recovery_no_spin.xml')
     default_bt_xml_through_poses = os.path.join(
         pkg_nav, 'behavior_trees', 'navigate_through_poses_w_replanning_and_recovery_no_spin.xml')
+
+    # ★ bt_navigator 的 odom_topic 按定位模式注入，保证与 TF 来源一致：
+    #    use_ekf:=false → /odom（FAST-LIO 原始输出）；use_ekf:=true → /odometry/filtered（EKF 融合输出）
+    #    ⚠️ 必须用 PythonExpression 运行时求值，不能用 Python == 比较 LaunchConfiguration 对象
+    bt_odom_topic = PythonExpression(
+        ["'/odometry/filtered' if '", LaunchConfiguration('use_ekf'), "' == 'true' else '/odom'"])
     configured_params = RewrittenYaml(
         source_file=params_file,
         root_key='',
@@ -71,6 +77,7 @@ def generate_launch_description():
             'default_nav_to_pose_bt_xml': default_bt_xml,
             'default_bt_xml_filename': default_bt_xml,
             'default_nav_through_poses_bt_xml': default_bt_xml_through_poses,
+            'odom_topic': bt_odom_topic,
         },
         convert_types=True
     )
@@ -194,9 +201,10 @@ def generate_launch_description():
         ]
     )
 
-    # ============ Web 端禁区层（两种模式都启动） ============
+    # ============ 禁区层（两种模式都启动） ============
     # 1. 禁区 mask 地图服务器：加载 keepout_mask.yaml，以 transient_local 发布 /keepout_filter_mask
-    #    （mask 语义：黑色=禁区，白色=可通行；网页修图后通过 /filter_mask_server/load_map 热加载）
+    #    （mask 语义：黑色=禁区，白色=可通行；Web UI 已移除，目前需手工编辑
+    #    maps/keepout_mask.pgm 后调用 /filter_mask_server/load_map 热加载或重启生效）
     keepout_yaml = os.path.join(pkg_nav, 'maps', 'keepout_mask.yaml')
     filter_mask_server = Node(
         package='nav2_map_server',
@@ -258,15 +266,17 @@ def generate_launch_description():
     )
 
     # ============ 雷达自遮挡过滤器（两种模式都启动） ============
-    # 剔除 base_link 系下车体自身与前货叉的反射点，输出干净的 /scan_filtered
-    # 过滤区域：x∈[-0.25, 1.60]m（覆盖车尾到货叉中部），y∈[-0.35, 0.35]m（车宽 0.7m）
-    # ⚠️ x_max 必须与 nav2_params.yaml 中 footprint 前边界保持一致，否则会留下避障盲区
+    # 剔除 base_link 系下车体自身、前货叉及叉上载货（>0.10m 进入切片部分）的反射点，
+    # 输出干净的 /scan_filtered
+    # 过滤区域：x∈[-0.35, 1.60]m（车尾到货叉叉尖，含 5cm 余量），y∈[-0.35, 0.35]m（车宽 0.7m）
+    # ⚠️ x_min/x_max 必须完全覆盖 nav2_params.yaml 全局 footprint（[-0.30, 1.60]），
+    #    否则车体/货物反射点落在 footprint 内会被标为障碍并膨胀，导致"自身碰撞"卡死
     laserscan_filter = Node(
         package='diuniu_base',
         executable='laserscan_filter',
         name='laserscan_filter',
         parameters=[{
-            'x_min': -0.25,
+            'x_min': -0.35,
             'x_max': 1.60,
             'y_min': -0.35,
             'y_max': 0.35,

@@ -93,15 +93,25 @@
 
 ### 订阅话题
 
-- **`/cmd_vel`** (`geometry_msgs/msg/Twist`)：下发速度、打角角度（自适应）以及升降和急停命令。
+- **`/cmd_vel`** (`geometry_msgs/msg/Twist`)：Nav2 自主导航下发的速度、打角角度（自适应）以及升降和急停命令。
+- **`/cmd_vel_joy`** (`geometry_msgs/msg/Twist`)：手柄 / Web 虚拟摇杆下发的速度命令，协议字段与 `/cmd_vel` 相同。
+
+### 双指令源仲裁（手柄优先）
+
+节点同时订阅 `/cmd_vel` 与 `/cmd_vel_joy`，采用**手柄优先**策略：最近 $0.5\text{s}$ 内收到过 `/cmd_vel_joy` 消息时，忽略 Nav2 的 `/cmd_vel`（日志显示 `🎮 [仲裁]`），松开手柄 $0.5\text{s}$ 后自动交还导航控制权。
+
+⚠️ 因此向 `/cmd_vel_joy` 发消息的节点（如 `diuniu_teleop_cmd_vel`）在停止控制后必须**彻底静默**（仅补发少量全零停止帧），不得持续发全零帧，否则会永久屏蔽 Nav2。
 
 ### 发布话题
 
-- **`/odom`** (`nav_msgs/msg/Odometry`)：地牛当前累加计算得到的里程计航迹。
+- **`/odom`** (`nav_msgs/msg/Odometry`)：地牛当前累加计算得到的里程计航迹。⚠️ 仅当 `pub_odom_topic:=true` 时发布（默认 `false`，实车由 FAST-LIO/EKF 提供 `/odom`，避免双重发布冲突）。
+- **`/wheel_odom`** (`nav_msgs/msg/Odometry`)：轮式里程计，始终发布（供 EKF 融合与监控）。
 - **`/imu/data`** (`sensor_msgs/msg/Imu`)：BNO085 发送的高频姿态四元数数据。
 
 ### 启动命令
 
 ```bash
 ros2 launch diuniu_base diuniu_base.launch.py port:=/dev/ttyUSB0
+# 无 SLAM 的纯底盘调试时才显式开启自带里程计：
+# ros2 launch diuniu_base diuniu_base.launch.py pub_odom_tf:=true pub_odom_topic:=true
 ```

@@ -23,6 +23,9 @@ def generate_launch_description():
             executable='diuniu_joy_publisher',
             name='diuniu_joy_publisher',
             parameters=[{
+                # 按设备名匹配（js0/js1 编号会被 NoMachine 等设备抢占，写死不可靠）；
+                # 匹配不到时才回退到 device 固定节点
+                'device_name': 'BTP-KP20D',
                 'device': '/dev/input/js0',
                 'publish_rate': 50.0,
                 'num_axes': 8,
@@ -39,6 +42,9 @@ def generate_launch_description():
             executable='diuniu_teleop_cmd_vel',
             name='diuniu_teleop_cmd_vel',
             parameters=[{
+                # ⚠️ 1.2 m/s / 2.5 rad/s 是 Nav2 导航限速 (0.6 / 1.0) 的 2 倍以上，
+                #    室内重载 + 后向无雷达感知，满推摇杆有风险；已确认保留快速挡，
+                #    依赖使能键 + 底盘 0.2s 看门狗 + 转向 240°/s 速率限制兜底
                 'max_linear_speed': 1.2,
                 'max_angular_speed': 2.5,
                 'axis_linear': 1,
@@ -50,6 +56,9 @@ def generate_launch_description():
                 'steer_invert': True,
                 'linear_invert': True,
                 'publish_rate': 20.0,
+                'require_enable_button': True,    # ★ 开启使能键保护（需按住使能键 RB 才能控制）
+                'linear_deadband': 0.06,          # ★ 死区设定为 0.06，防止 0.05 的零点漂移
+                'angular_deadband': 0.06,          # ★ 转向死区同步设定为 0.06
             }],
             output='screen',
         ),

@@ -32,13 +32,15 @@ def generate_launch_description():
 
         DeclareLaunchArgument(
             'pub_odom_tf',
-            default_value='true',
-            description='Whether to publish odom TF'
+            default_value='false',
+            description='Whether to publish odom TF（默认 false：实车由 FAST-LIO/EKF 发布，'
+                        '默认 true 单独启动时会与 FAST-LIO 双重发布冲突；仅无 SLAM 的纯底盘调试时设 true）'
         ),
         DeclareLaunchArgument(
             'pub_odom_topic',
-            default_value='true',
-            description='Whether to publish odom topic'
+            default_value='false',
+            description='Whether to publish odom topic（默认 false：避免与 FAST-LIO /odom 冲突；'
+                        '仅无 SLAM 的纯底盘调试时设 true，/wheel_odom 始终发布不受影响）'
         ),
 
         DeclareLaunchArgument(
