@@ -199,7 +199,9 @@ controller_server:
       cost_scaling_dist: 0.8             # ★ 扩大探测距离至 0.8m，提早感知内墙壁的存在
       cost_scaling_gain: 10.0
       inflation_cost_scaling_factor: 3.5         # 注意：此项只在靠近高代价区时降低线速度（不控制方向！RPP 纯追踪永远只追预瞄点，无侧向避障能力）。贴墙时自动降速，配合全局 V 谷居中路径实现切外弯
-      use_rotate_to_heading: false  # 禁用 RPP 原地自转对齐。防止长车身货叉在转弯时原地旋转扫墙导致避障卡死
+      use_rotate_to_heading: true   # ★ 开启自转对齐，允许在起点/终点进行原地自转修正，提高到点对位速度
+      rotate_to_heading_yaw_limit: 1.0 # ★ 限制大偏角原地旋转，循迹过程中不自转
+      rotate_to_heading_angular_vel: 0.8 # ★ 原地旋转角速度 0.8 rad/s，对齐并留有平滑器上限（1.0）余量
       # ★ 允许倒车（插货对位刚需）：近点过冲/航向偏差可倒车修正，不再只能绕 1.3m 大圈。
       #    安全性由 track_unknown_space=true 保证：只允许倒入雷达扫过且为空的区域
       allow_reversing: true

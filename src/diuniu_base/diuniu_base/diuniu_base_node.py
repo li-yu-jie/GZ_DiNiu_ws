@@ -161,7 +161,8 @@ class DiuNiuBaseNode(Node):
                 throttle_duration_sec=2.0
             )
             return
-        self.update_cmd_vel(msg, allow_pure_rotation=False)
+        # 开启原地自转：允许导航在末端或大角度偏差时进行 ±90° 前轮垂直的原地旋转修正
+        self.update_cmd_vel(msg, allow_pure_rotation=True)
 
     def cmd_vel_joy_callback(self, msg):
         """
