@@ -172,7 +172,7 @@ controller_server:
     general_goal_checker:
       stateful: true                    # ★ 必须保持 true：xy 一旦满足即锁存，之后只盯 yaw，防位姿抖动反复
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.40
+      xy_goal_tolerance: 0.05           # ★ 5cm = 0.05m：位置精度极致收紧
       yaw_goal_tolerance: 0.0175        # ★ 1° = 0.0175rad：插货极致精度收紧
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
@@ -330,9 +330,9 @@ planner_server:
       plugin: "nav2_smac_planner/SmacPlannerHybrid" # ★ 工业叉车 Hybrid-A* 运动学规划器
       downsample_costmap: true         # ★ 开启代价地图降采样（加速长距离路径搜索）
       downsampling_factor: 2           # ★ 降采样因子设为 2（从 5cm 降为 10cm 规划网格，大幅提升狭窄通道规划连通性，防止误判堵塞）
-      # ★ tolerance 必须 ≤ goal_checker 的 xy_goal_tolerance(0.40)！否则目标落膨胀区时
+      # ★ tolerance 必须 ≤ goal_checker 的 xy_goal_tolerance(0.05)！否则目标落膨胀区时
       #    规划器"妥协成功"（路径只修到 0.5m 内），而到点判定永远不满足 → 近点绕圈+无限重规划
-      tolerance: 0.4
+      tolerance: 0.05                   # ★ 5cm = 0.05m：全局规划逼近精度收紧
       allow_unknown: false            # ★ 未知=障碍：建图未覆盖区域禁止规划穿越（倒车安全的另一半）
       max_iterations: 2000000
       max_on_approach_iterations: 10000 # 增大逼近迭代上限
