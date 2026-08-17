@@ -173,7 +173,7 @@ controller_server:
       stateful: true                    # ★ 必须保持 true：xy 一旦满足即锁存，之后只盯 yaw，防位姿抖动反复
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.15           # ★ 15cm = 0.15m：位置精度收紧
-      yaw_goal_tolerance: 0.0087        # ★ 0.5° = 0.0087rad：插货极致超高精度收紧
+      yaw_goal_tolerance: 0.0175        # ★ 1° = 0.0175rad：插货高精度对齐判定
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
