@@ -307,25 +307,25 @@ global_costmap:
 map_server:
   ros__parameters:
     use_sim_time: false
-    yaml_filename: ""
+    yaml_filename: ""                    # 地图路径在 launch 启动时通过参数动态传入并加载
 
 # ---------- 禁区过滤器信息服务：向 global_costmap 的 keepout_filter 通告 mask 话题与换算系数 ----------
-# type: 0 = 禁区(Keepout)；filter_value = base + multiplier × mask占用值，黑色占用格(100) → 禁区
+# 作用：定义禁区 Cost 值映射公式 (Cost = base + multiplier × mask值)
 costmap_filter_info_server:
   ros__parameters:
     use_sim_time: false
-    type: 0
-    filter_info_topic: "/costmap_filter_info"
-    mask_topic: "/keepout_filter_mask"
-    base: 0.0
-    multiplier: 1.0
+    type: 0                              # 0 = 禁区过滤器 (Keepout Filter)
+    filter_info_topic: "/costmap_filter_info" # 通报给代价地图的信息话题
+    mask_topic: "/keepout_filter_mask"   # 订阅静态黑白栅格 mask 图像话题
+    base: 0.0                            # 基础 Cost 偏移量
+    multiplier: 1.0                      # Cost 缩放乘子 (黑色像素100 * 1.0 = 100 致命障碍 Cost)
 
 # ---------- 全局规划器：基于静态+实时代价地图搜索全局路径 ----------
 planner_server:
   ros__parameters:
-    expected_planner_frequency: 2.0
+    expected_planner_frequency: 2.0     # 全局重规划期望频率设为 2.0Hz (每 0.5 秒重算一次路径)
     use_sim_time: false
-    planner_plugins: ["GridBased"]
+    planner_plugins: ["GridBased"]      # 规划器插件别名
     GridBased:
       plugin: "nav2_smac_planner/SmacPlannerHybrid" # ★ 工业叉车 Hybrid-A* 运动学规划器
       downsample_costmap: true         # ★ 开启代价地图降采样（加速长距离路径搜索）
@@ -334,45 +334,46 @@ planner_server:
       #    规划器"妥协成功"（路径只修到 0.5m 内），而到点判定永远不满足 → 近点绕圈+无限重规划
       tolerance: 0.15                   # ★ 15cm = 0.15m：全局规划逼近精度收紧
       allow_unknown: false            # ★ 未知=障碍：建图未覆盖区域禁止规划穿越（倒车安全的另一半）
-      max_iterations: 2000000
-      max_on_approach_iterations: 10000 # 增大逼近迭代上限
+      max_iterations: 2000000          # 路径搜索最大迭代次数上限 (200万次，保证复杂长路径搜索不中断)
+      max_on_approach_iterations: 10000 # 接近目标点时的逼近迭代上限
       max_planning_time: 5.0           # 最大容许规划时间放宽至 5.0s，防止超时退出
       analytic_expansion_ratio: 5.0    # 增大解析膨胀比例，加速末端 Reeds-Shepp 曲线收敛
       # ★ 缩短至 0.5m！防止解析膨胀从远距离强行插入 Reeds-Shepp 泊车甩尾曲线
       analytic_expansion_max_length: 0.5
       # ★ REEDS_SHEPP（允许倒车段）：插货对位需要倒车修正能力（汽车泊车原理）
       motion_model_for_search: "REEDS_SHEPP"
-      reverse_penalty: 20.0
+      reverse_penalty: 20.0            # ★ 倒车惩罚系数：倒车成本 = 距离 × 20，中长途强迫规划前进，仅末端微调允许倒车
       change_penalty: 15.0             # ★ 提高至 15.0：重罚末端前进/后退频繁换向，消灭末端路径的"尖尖"(V字折线)！
       non_straight_penalty: 2.2        # ★ 提高至 2.2：重罚转向段，规划器偏好"先摆正车身再直穿门/直行道"，杜绝斜角进门导致叉尖扫门框的几何死局
       cost_penalty: 2.5                # ★ 折中 2.5：3.5 时窄走廊里逐个躲避墙包代价场导致路径蛇形、方向盘左右打；2.5 保留"开阔区绕外不抄近道"的效果，又不对微小代价噪点过度反应
       use_final_approach_orientation: false # ★ 关键参数：末端路径不强行甩尾匹配目标角度
       minimum_turning_radius: 0.35       # ★ 设为 0.35m！避免规划器按 1.3m 轴距在末端画出半径 1.3m 的甩尾膨胀弧线（消灭红线"尖尖"的根本），到点后由 RPP 90° 原地自转对齐 1° 航向
-      lookup_table_size: 20.0
-      cache_obstacle_heuristic: false
-      debug_visualizations: false
+      lookup_table_size: 20.0          # 启发式查找表大小 (20m)
+      cache_obstacle_heuristic: false  # 是否缓存障碍物启发式地图
+      debug_visualizations: false     # 关闭调试点云发布以节省 CPU
       smoother:
-        max_iterations: 2000
+        max_iterations: 2000           # 路径平滑器最大迭代次数
         w_smooth: 0.5                  # ★ 折中 0.5：0.4 时 A* 残留的微小蛇形原样下发，RPP 预瞄点左右跳导致打方向；0.5 熨平走廊微弯，又不至于像 0.6 那样在拐角硬拉直线切内侧
-        w_data: 0.15                   # 折中数据吸引力
-        tolerance: 1e-10
+        w_data: 0.15                   # 原始路径点吸引力权重
+        tolerance: 1e-10               # 平滑收敛判定阈值
 
+# ---------- 行为服务器：管理 恢复行为 (Recovery Behaviors) ----------
 behavior_server:
   ros__parameters:
-    costmap_topic: local_costmap/costmap_raw
-    footprint_topic: local_costmap/published_footprint
-    cycle_frequency: 10.0
+    costmap_topic: local_costmap/costmap_raw # 恢复行为使用的底层代价地图
+    footprint_topic: local_costmap/published_footprint # 恢复行为使用的车体轮廓
+    cycle_frequency: 10.0              # 行为服务器检查频率 10Hz
     behavior_plugins: ["wait"]
     # ⚠️ 已移除 backup 插件：自定义行为树的恢复动作只有 Wait+清代价地图，BackUp 是死配置；
     #    且本车后向无雷达视野，恢复性倒车本身不安全。若未来需要 BackUp，请同步在行为树
     #    RoundRobin 中加入 <BackUp> 并重新评估后向感知。
     wait:
-      plugin: "nav2_behaviors/Wait"
-    global_frame: odom
-    robot_base_frame: base_link
+      plugin: "nav2_behaviors/Wait"    # 原地挂起等待恢复插件
+    global_frame: odom                 # 行为检测与控制坐标系
+    robot_base_frame: base_link        # 机器人基坐标系
     transform_tolerance: 0.5    # ★ 与其他节点统一为 0.5s；FAST-LIO 10Hz（帧间隔 100ms），0.1s 近零余量，CPU 稍忙即触发 TF 查询失败中止恢复行为
     use_sim_time: false
-    simulate_ahead_time: 2.0
+    simulate_ahead_time: 2.0           # 恢复行为碰撞预测时间窗口 (2.0s)
 
 # ---------- 速度平滑器：cmd_vel_nav → cmd_vel（消阶跃 + 消除 w/v 不匹配） ----------
 # ★ 关键：缺省配置时 Humble 默认 max_velocity.x=0.5，会把 RPP 的 0.8 静默截断，
@@ -381,11 +382,10 @@ behavior_server:
 velocity_smoother:
   ros__parameters:
     use_sim_time: false
-    smoothing_frequency: 20.0
-    feedback: "OPEN_LOOP"
-    max_velocity: [0.6, 0.0, 1.0]      # ★ x 上限与 RPP desired_linear_vel 严格对齐（0.6）
-    min_velocity: [-0.6, 0.0, -1.0]    # ★ 负向 x 为 RPP 倒车修正保留（REEDS_SHEPP 对位/脱困需要）
-    max_accel: [0.5, 0.0, 2.0]         # ★ 限制线/角加速度：抹平启动阶跃与 AMCL 0.5s 位姿跳变带来的 w 抖动
-    max_decel: [-1.0, 0.0, -2.5]
-    # OPEN_LOOP 反馈不使用里程计，无需配置 odom_topic
-    velocity_timeout: 1.0
+    smoothing_frequency: 20.0          # 控制指令平滑发包频率 20Hz (50ms)
+    feedback: "OPEN_LOOP"              # 开环平滑模式 (防里程计反馈时延引入过冲)
+    max_velocity: [0.6, 0.0, 1.0]      # ★ x 线速度、y 线速度、z 角速度上限 (线速 0.6m/s 与 RPP 严格对齐)
+    min_velocity: [-0.6, 0.0, -1.0]    # ★ 负向 x 为 RPP 倒车修正保留 (最小线速 -0.6m/s)
+    max_accel: [0.5, 0.0, 2.0]         # ★ 限制线/角加速度：[0.5m/s², 0m/s², 2.0rad/s²]，抹平启动阶跃
+    max_decel: [-1.0, 0.0, -2.5]       # ★ 限制线/角减速制动速率：[-1.0m/s², 0m/s², -2.5rad/s²]
+    velocity_timeout: 1.0              # 控制指令超时时间 1.0s (超过后降速归零)
