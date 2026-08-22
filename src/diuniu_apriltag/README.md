@@ -25,12 +25,15 @@ usb_cam (相机驱动, 1920x1080 MJPG, 加载标定内参)
 ## 快速启动（推荐）
 
 ```bash
-# 宿主机上一键启动（自动定位相机设备号，容器内拉起全链路）
+# 一键启动（自动定位相机设备号，拉起全链路）
 ~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_apriltag.sh
 
 # 带 RViz 可视化（相机画面 + tag 坐标轴叠加）
 ~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_apriltag.sh rviz:=true
 ```
+
+> 脚本**宿主机和容器内都能跑**：宿主机上自动 `docker exec` 进容器启动；
+> `ros2y` 进容器后直接运行则本地启动（/dev 缺节点时自动 sudo mknod 补齐）。
 
 - `start_apriltag.sh` 先调用容器内 `ensure_camera.sh`：按名字 `XW500U3` 扫描
   sysfs 找到当前设备号，容器 /dev 缺节点则自动 `mknod` 补齐（容器 /dev 是启动
@@ -39,11 +42,14 @@ usb_cam (相机驱动, 1920x1080 MJPG, 加载标定内参)
   `scripts/99-xw500u3.rules` 头部注释）。**注意该规则对容器无效**，容器内
   永远以 `ensure_camera.sh` 为准。
 
-实时距离监视（宿主机执行，弹出 "AprilTag 实时距离" 窗口，10Hz 刷新 z/x/y/偏航）：
+实时距离监视（10Hz 刷新 z/x/y/偏航）：
 
 ```bash
 ~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_distance_watch.sh
 ```
+
+> 宿主机上运行弹 "AprilTag 实时距离" 桌面窗口；容器内（ros2y）运行则
+> 直接在当前终端显示，Ctrl+C 退出。
 
 ## 一、相机内参标定（已完成，仅重标时需要）
 
