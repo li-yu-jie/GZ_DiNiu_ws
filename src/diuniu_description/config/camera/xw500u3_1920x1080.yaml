@@ -1,0 +1,26 @@
+image_width: 1920
+image_height: 1080
+camera_name: xw500u3
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [1721.32342,    0.     ,  952.27026,
+            0.     , 1743.82136,  608.64422,
+            0.     ,    0.     ,    1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.053859, 0.121656, 0.000064, -0.003166, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [1719.28662,    0.     ,  946.47667,    0.     ,
+            0.     , 1745.04395,  607.60546,    0.     ,
+            0.     ,    0.     ,    1.     ,    0.     ]

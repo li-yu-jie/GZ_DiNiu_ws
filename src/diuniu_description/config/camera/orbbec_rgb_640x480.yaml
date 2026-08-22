@@ -1,0 +1,26 @@
+image_width: 640
+image_height: 480
+camera_name: orbbec_dabai_dcw_rgb_camera:_or
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [623.15423,   0.     , 353.01731,
+           0.     , 635.56607, 281.99825,
+           0.     ,   0.     ,   1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.071539, -0.073844, 0.010803, 0.019881, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [630.98187,   0.     , 362.46608,   0.     ,
+           0.     , 652.37634, 285.12416,   0.     ,
+           0.     ,   0.     ,   1.     ,   0.     ]
