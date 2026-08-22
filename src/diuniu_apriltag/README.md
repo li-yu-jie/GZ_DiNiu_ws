@@ -39,14 +39,10 @@ usb_cam (相机驱动, 1920x1080 MJPG, 加载标定内参)
   `scripts/99-xw500u3.rules` 头部注释）。**注意该规则对容器无效**，容器内
   永远以 `ensure_camera.sh` 为准。
 
-实时距离监视（另开一个桌面终端，10Hz 刷新 z/x/y/偏航）：
+实时距离监视（宿主机执行，弹出 "AprilTag 实时距离" 窗口，10Hz 刷新 z/x/y/偏航）：
 
 ```bash
-# 宿主机执行，弹出 "AprilTag 实时距离" 窗口
-DISPLAY=:1 gnome-terminal --title "AprilTag 实时距离" -- \
-  bash -c 'docker exec -it ros2_humble su - y -c \
-  "source /opt/ros/humble/setup.bash && \
-   python3 ~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/distance_watch.py"'
+~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_distance_watch.sh
 ```
 
 ## 一、相机内参标定（已完成，仅重标时需要）
@@ -208,9 +204,10 @@ diuniu_apriltag/
 ├── launch/apriltag.launch.py        # 一键启动 5 节点（相机/中继/去畸变/识别/RViz）
 ├── config/apriltag.yaml             # 检测器 + 标签尺寸配置（距离尺度权威来源）
 ├── diuniu_apriltag/camera_info_relay.py  # camera_info 补 frame_id 中继
-├── scripts/start_apriltag.sh        # 宿主机一键启动（自动定位相机）
+├── scripts/start_apriltag.sh        # 宿主机一键启动识别链路（自动定位相机）
+├── scripts/start_distance_watch.sh  # 宿主机弹出实时距离窗口
 ├── scripts/ensure_camera.sh         # 容器内定位 XW500U3 并 mknod 补 /dev 节点
-├── scripts/distance_watch.py        # 实时距离监视终端（10Hz：z/x/y/偏航）
+├── scripts/distance_watch.py        # 实时距离监视（被 start_distance_watch.sh 调用）
 ├── scripts/99-xw500u3.rules         # 宿主机 udev 固定 /dev/xw500u3（可选，需 sudo）
 ├── rviz/apriltag.rviz               # RViz 布局：相机画面 + TF 坐标轴
 └── README.md
