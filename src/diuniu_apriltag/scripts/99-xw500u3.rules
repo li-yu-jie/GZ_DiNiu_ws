@@ -1,0 +1,11 @@
+# XW500U3 相机 udev 规则（宿主机 /etc/udev/rules.d/99-xw500u3.rules）
+#
+# 作用：无论 USB 重插后设备号怎么变，都建立固定软链接 /dev/xw500u3
+# 安装（宿主机上执行一次）：
+#   sudo cp 99-xw500u3.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# 注意：容器内 /dev 是启动时快照，本规则不能直接传进容器；
+# 容器内请使用同目录的 ensure_camera.sh（start_apriltag.sh 已自动调用）。
+
+SUBSYSTEM=="video4linux", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="3038", ATTR{index}=="0", SYMLINK+="xw500u3", MODE="0666"
