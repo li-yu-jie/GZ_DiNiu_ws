@@ -12,7 +12,9 @@ WS=/home/y/GZ_DiNiu_ws
 
 if [ -f /.dockerenv ]; then
     # —— 容器内模式：当前终端直接跑 ——
+    set +u   # ROS setup.bash 引用未定义变量，与 set -u 冲突
     source /opt/ros/humble/setup.bash
+    set -u
     exec python3 "$WS/src/diuniu_apriltag/scripts/distance_watch.py"
 else
     # —— 宿主机模式：弹桌面窗口 ——

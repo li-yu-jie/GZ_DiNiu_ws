@@ -18,8 +18,11 @@ if [ -f /.dockerenv ]; then
     # /dev 节点通常已存在；缺失时 mknod 需要 root，走 sudo
     DEV=$(bash "$SCRIPT" 2>/dev/null) || DEV=$(sudo bash "$SCRIPT")
     echo "相机设备: $DEV"
+    # ROS setup.bash 引用未定义变量，与 set -u 冲突，先临时关掉
+    set +u
     source /opt/ros/humble/setup.bash
     source "$WS/install/setup.bash"
+    set -u
     exec ros2 launch diuniu_apriltag apriltag.launch.py video_device:="$DEV" "$@"
 else
     # —— 宿主机模式 ——
