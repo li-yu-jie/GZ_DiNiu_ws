@@ -56,8 +56,9 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'tag_size',
-            default_value='0.08',
+            default_value='0.0941',
             description='AprilTag 黑色方块外缘边长 (m)，不含白色留白边。'
+                        '2026-08-22 三点卷尺现场标定值 94.1mm。'
                         '注意：tag0 的 TF 尺度以 config/apriltag.yaml 的 tag.sizes 为准'
         ),
 
