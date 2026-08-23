@@ -116,14 +116,23 @@ def generate_launch_description():
     )
 
     # ======================== 模式 B：AMCL 定位（use_amcl:=true） ========================
-    # 直接使用 nav2_bringup 的标准 bringup：map_server + AMCL + 全套导航节点
+    # 等效于 nav2_bringup bringup_launch.py（= localization + navigation），
+    # 但 navigation 部分改用 diuniu_navigation_launch.py（含 collision_monitor 急停链）
     bringup_with_amcl = GroupAction(
         condition=IfCondition(use_amcl),
         actions=[
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(os.path.join(pkg_nav_bringup, 'launch', 'bringup_launch.py')),
+                PythonLaunchDescriptionSource(os.path.join(pkg_nav_bringup, 'launch', 'localization_launch.py')),
                 launch_arguments={
                     'map': map_yaml,
+                    'params_file': configured_params,
+                    'use_sim_time': use_sim_time,
+                    'autostart': 'true'
+                }.items()
+            ),
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(os.path.join(pkg_nav, 'launch', 'diuniu_navigation_launch.py')),
+                launch_arguments={
                     'params_file': configured_params,
                     'use_sim_time': use_sim_time,
                     'autostart': 'true'
@@ -190,8 +199,10 @@ def generate_launch_description():
             ),
             # ---------- 导航核心：planner / controller / behavior / bt_navigator ----------
             # 两种子模式共用
+            # ★ 使用 diuniu_navigation_launch.py（含 collision_monitor 急停链），
+            #    勿改回 nav2_bringup 原版 navigation_launch.py（无急停层）
             IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(os.path.join(pkg_nav_bringup, 'launch', 'navigation_launch.py')),
+                PythonLaunchDescriptionSource(os.path.join(pkg_nav, 'launch', 'diuniu_navigation_launch.py')),
                 launch_arguments={
                     'use_sim_time': use_sim_time,
                     'autostart': 'true',

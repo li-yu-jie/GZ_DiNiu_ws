@@ -90,8 +90,8 @@
   <joint name="laser_joint" type="fixed">
     <parent link="base_link"/>
     <child link="laser_link"/>
-    <!-- 雷达真实物理安装高度为 66cm (0.66m) -->
-    <origin xyz="1.215 0 0.66" rpy="0 0 0"/> 
+    <!-- 雷达真实物理安装：高度为 160cm (1.60m)，倒装 (roll=180° / 3.14159265 rad) -->
+    <origin xyz="1.215 0 1.60" rpy="3.14159265 0 0"/> 
   </joint>
 
 </robot>

@@ -19,16 +19,18 @@ apriltag:
     max_hamming: 0
 
     detector:
-      # 检测线程数
-      threads: 2
-      # 图像降采样因子：1.0 = 不降采样（640x480 小图，保精度优先）
-      decimate: 1.0
+      # 检测线程数（16 核机器，给足 4 线程压低单帧耗时）
+      threads: 4
+      # 图像降采样因子：2.0 = 半分辨率做四边形初检（检测成本降至 1/4），
+      # refine=true 会在原分辨率上细化角点，位姿精度几乎不受影响。
+      # 1080p 下这是流畅度的关键（2026-08-22 卡顿治理）。
+      decimate: 2.0
       # 高斯模糊 sigma：0.0 = 不模糊（去噪与角点锐度的权衡）
       blur: 0.0
-      # 边缘细化：提高角点定位精度
+      # 边缘细化：提高角点定位精度（decimate=2 时必须开，保住亚像素精度）
       refine: true
-      # 图像锐化强度（解码前对图像做 unsharp mask）
-      sharpening: 0.25
+      # 图像锐化强度（解码前对图像做 unsharp mask）；0 = 关闭，省一次全图卷积
+      sharpening: 0.0
       # debug 模式：保存中间图像到 ~/.ros（调试用，平时关闭）
       debug: false
 
