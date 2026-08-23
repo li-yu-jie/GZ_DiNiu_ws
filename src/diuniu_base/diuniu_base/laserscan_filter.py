@@ -14,10 +14,10 @@ class LaserScanFilter(Node):
         # 默认值与 diuniu_nav.launch.py / diuniu_mapping.launch.py 保持一致：
         # 过滤盒必须完全覆盖全局 footprint（x∈[-0.30, 1.60]，含货叉叉尖与叉上载货自遮挡）
         self.declare_parameter('x_min', -0.35)
-        self.declare_parameter('x_max', 1.60)
-        self.declare_parameter('y_min', -0.35)
-        self.declare_parameter('y_max', 0.35)
-        self.declare_parameter('laser_x_offset', 0.0)
+        self.declare_parameter('x_max', 1.65)
+        self.declare_parameter('y_min', -0.40)
+        self.declare_parameter('y_max', 0.40)
+        self.declare_parameter('laser_x_offset', 1.215) # ★ 雷达安装在 base_link 前方 1.215m 处
         self.declare_parameter('laser_y_offset', 0.0)
         
         self.x_min = self.get_parameter('x_min').value
