@@ -235,9 +235,9 @@ class DiuNiuBaseNode(Node):
             alpha_rad = math.atan((w * self.wheelbase) / v)
             alpha_deg = math.degrees(alpha_rad)
             
-            # 行驶状态下限制最大打角为 75.0°，防止前轮完全垂直横置导致前进起步憋死电机、原地打滑或机械顿卡！
-            if alpha_deg > 75.0: alpha_deg = 75.0
-            if alpha_deg < -75.0: alpha_deg = -75.0
+            # 允许最大打角达到 90.0°（匹配地牛机械物理转向能力上限）
+            if alpha_deg > 90.0: alpha_deg = 90.0
+            if alpha_deg < -90.0: alpha_deg = -90.0
 
             v_front = v
 
