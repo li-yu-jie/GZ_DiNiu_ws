@@ -173,7 +173,7 @@ controller_server:
       stateful: true                    # ★ 保持 true：xy 一旦满足即锁存，只盯 yaw
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.15           # ★ 15cm 位置精度
-      yaw_goal_tolerance: 0.05         # ★ 放宽至 0.05rad (约 2.8°)，避免定位微小抖动导致末端反复无休止微调！
+      yaw_goal_tolerance: 0.0175        # ★ 严格保持 1.0° (0.0175rad) 高精度对齐判定（插货/载货高精度对位硬性要求！）
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
@@ -194,9 +194,9 @@ controller_server:
       cost_scaling_dist: 0.8
       cost_scaling_gain: 10.0
       inflation_cost_scaling_factor: 3.5
-      use_rotate_to_heading: false   # ★ 三轮 Tricycle 无法原地自转，禁用自转对齐，防末端强行旋转打死方向盘
-      rotate_to_heading_yaw_limit: 1.0
-      rotate_to_heading_angular_vel: 0.8
+      use_rotate_to_heading: true    # ★ 开启自转对齐：利用底盘前轮 90° 转向能力，在起点/终点大偏角时打角 90° 旋转摆正航向
+      rotate_to_heading_yaw_limit: 1.0 # 偏角 > 1.0 rad 时触发 90° 打角自转
+      rotate_to_heading_angular_vel: 0.6 # 原地旋转角速度 0.6 rad/s，对齐更精准且平稳
       # ★ 允许倒车（插货对位刚需）：近点过冲/航向偏差可倒车修正，不再只能绕 1.3m 大圈。
       #    安全性由 track_unknown_space=true 保证：只允许倒入雷达扫过且为空的区域
       allow_reversing: true
