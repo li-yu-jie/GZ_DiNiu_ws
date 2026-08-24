@@ -313,9 +313,10 @@ class DiuNiuBaseNode(Node):
                             length = parsed[0]
                             vx = parsed[1]
                             wz = parsed[2]
-                            imu1_qw, imu1_qx, imu1_qy, imu1_qz = parsed[3:7]
-                            
-                            self.publish_sensor_data(vx, wz, imu1_qw, imu1_qx, imu1_qy, imu1_qz)
+                            # 帧内 IMU1 槽位无真实数据(恒定单位四元数)，BNO085 实际挂在 IMU2 槽位
+                            imu2_qw, imu2_qx, imu2_qy, imu2_qz = parsed[7:11]
+
+                            self.publish_sensor_data(vx, wz, imu2_qw, imu2_qx, imu2_qy, imu2_qz)
                             del buffer[:52]
                         else:
                             # 校验和错误，可能是文本段撞字符，丢弃头部并继续寻找
@@ -423,13 +424,23 @@ class DiuNiuBaseNode(Node):
         # 2. 发布 IMU 话题 (使用 BNO085 的高频融合绝对姿态四元数)
         imu = Imu()
         imu.header.stamp = current_time.to_msg()
-        imu.header.frame_id = 'imu_link'
-        
+        # BNO085 在底盘主控板上，与雷达内置 IMU (imu_link) 是两个器件，frame 勿混用
+        imu.header.frame_id = 'base_imu_link'
+
         # 严格遵守 ROS 2 官方坐标系标准赋值 (x, y, z, w)
         imu.orientation.w = qw
         imu.orientation.x = qx
         imu.orientation.y = qy
         imu.orientation.z = qz
+        # EKF 融合要求非零协方差；BNO085 融合姿态典型精度取 roll/pitch 0.05、yaw 0.02 (rad²)
+        imu.orientation_covariance = [
+            0.05, 0.0,  0.0,
+            0.0,  0.05, 0.0,
+            0.0,  0.0,  0.02
+        ]
+        # 单片机帧内无陀螺仪/加速度计原始数据，按 ROS 约定首元素置 -1 表示“不提供该量”
+        imu.angular_velocity_covariance[0] = -1.0
+        imu.linear_acceleration_covariance[0] = -1.0
         self.pub_imu.publish(imu)
 
     def destroy_node(self):

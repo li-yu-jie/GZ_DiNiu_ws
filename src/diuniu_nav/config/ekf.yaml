@@ -3,8 +3,11 @@
 #
 # 融合传感器源：
 #   1. 轮式里程计 (/wheel_odom): 提供高频线速度 vx 和角速度 wz (静止时 0 噪声)
-#   2. FAST-LIO SLAM 里程计 (/odom): 提供空间 2D 厘米级位姿 (x, y) 和偏航角 yaw
-#   3. 板载 IMU (/imu/data): 提供高频偏航角速度与绝对姿态
+#   2. 底盘 BNO085 IMU (/imu/data): 提供绝对航向 yaw (唯一航向源)
+#   ⚠️ FAST-LIO /odom 不送进 EKF：它的 x,y 在 FAST-LIO 自己的 odom 系
+#      (航向以 Mid360 IMU 上电朝向为 0)，与 EKF 锚定 BNO085 航向的 odom 系
+#      存在常值旋转，融合会导致预测/观测互拉、位姿跳变"乱跑"(2026-08-24 实车事故)。
+#      FAST-LIO 仅用于把 3D 点云切成 /scan；绝对位姿由 AMCL 地图匹配提供。
 # =============================================================================
 ekf_filter_node:
   ros__parameters:
@@ -37,26 +40,20 @@ ekf_filter_node:
     odom0_differential: false
     odom0_relative: false
 
-    # ── 传感器 2: FAST-LIO SLAM 里程计 ──────────────────────────────────────
-    # FAST-LIO 原始发布 /Odometry，mapping.launch.py 已 remap 为 /odom
-    odom1: /odom
-    odom1_config: [true,  true,  false,   # x, y, z
-                   false, false, true,    # roll, pitch, yaw
-                   false, false, false,   # vx, vy, vz
-                   false, false, false,   # vroll, vpitch, vyaw
-                   false, false, false]   # ax, ay, az
-    odom1_queue_size: 10
-    odom1_nodelay: true
-    odom1_differential: false
-    odom1_relative: false
+    # ── (已移除) FAST-LIO /odom ─────────────────────────────────────────────
+    # 勿把 FAST-LIO 的 x,y 或 yaw 加回 EKF：坐标系与 BNO085 锚定的 odom 系不一致，
+    # 会引起位姿互拉扯导致车在地图上乱跑。详见文件头注释。
 
-    # ── 传感器 3: BNO085 / IMU (/imu/data) ─────────────────────────────────────
-    # 融合角速度 wz，辅助旋转平滑
+    # ── 传感器 3: 底盘 BNO085 / IMU (/imu/data, frame: base_imu_link) ─────────────
+    # ★ 融合绝对航向 yaw（BNO085 融合四元数），作为整车唯一绝对航向源；
+    #    与 map 系的常值偏差由 AMCL 的 map→odom 变换自动吸收
+    # ⚠️ 勿开 vyaw：单片机帧内无陀螺仪原始数据，angular_velocity 恒为 0，
+    #    融合它会错误地把航向角速度钉死在 0，与轮式里程计/FAST-LIO 对抗
     imu0: /imu/data
     imu0_config: [false, false, false,
+                  false, false, true,     # yaw ← BNO085 绝对航向
                   false, false, false,
-                  false, false, false,
-                  false, false, true,     # vyaw
+                  false, false, false,    # vyaw ← 无数据，必须关闭
                   false, false, false]
     imu0_queue_size: 10
     imu0_nodelay: true

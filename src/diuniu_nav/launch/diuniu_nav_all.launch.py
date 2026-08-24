@@ -40,7 +40,7 @@ def generate_launch_description():
     use_ekf = LaunchConfiguration('use_ekf')
     declare_use_ekf = DeclareLaunchArgument(
         'use_ekf',
-        default_value='false',
+        default_value='true',
         description='true=开启 EKF 多源融合（此时关闭 FAST-LIO 的 TF 广播，由 EKF 统一发布 odom->base_link TF）'
     )
 

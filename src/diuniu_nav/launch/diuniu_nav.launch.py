@@ -246,21 +246,41 @@ def generate_launch_description():
                     {'node_names': ['filter_mask_server', 'costmap_filter_info_server']}]
     )
 
+    # ============ 点云水平补偿节点（两种模式都启动） ============
+    # 用 FAST-LIO /odom 的重力对齐姿态实时消除桅杆摆动的 roll/pitch，再交给切片。
+    # 不补偿时支架晃动会把头顶横梁/门架压进切片 → 前方"幽灵障碍"（2026-08-24 实车事故根因）
+    cloud_level = Node(
+        package='diuniu_base',
+        executable='cloud_level',
+        name='cloud_level_node',
+        parameters=[{
+            'cloud_in': '/cloud_registered_body',
+            'cloud_out': '/cloud_leveled',
+            'odom_topic': '/odom',
+        }],
+        output='screen'
+    )
+
     # ============ 3D 点云 → 2D 激光切片节点（两种模式都启动） ============
-    # 将 FAST-LIO 输出的机体坐标系点云压扁成 2D LaserScan，供代价地图避障与 AMCL 使用
+    # 将补偿后的水平点云压扁成 2D LaserScan，供代价地图避障与 AMCL 使用
+    # ⚠️ 高度区间是【雷达系 z】（点云原点在 1.6m 高的雷达处，frame_id 虽叫 base_link
+    #    但 pointcloud_to_laserscan 做恒等变换，z 不平移）：
+    #      z∈[-1.40, 0.0]  =  地面以上 [0.20, 1.60]m —— 与地图建图切片层严格一致，
+    #    可看到托盘/纸箱/脚踝；此前误设为 [0.10,1.20]（实为地面 1.7~2.8m 层，
+    #    与地图层完全不重叠 → "地图不对"+30% 扫描点无法匹配）
     pointcloud_to_laserscan = Node(
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
         name='pointcloud_to_laserscan',
         remappings=[
-            ('cloud_in', '/cloud_registered_body'),  # FAST-LIO 机体系点云（frame: base_link）
+            ('cloud_in', '/cloud_leveled'),  # 水平补偿后的机体系点云（frame: base_link）
             ('scan', '/scan'),
         ],
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.2,   # ★ 放宽至 0.2s：FAST-LIO 10Hz 发布时自然抖动 ~100ms，0.05s 容忍度过严导致频繁丢帧警告
-            'min_height': 0.10,       # ★ 设为 10cm！全面捕捉前方人体脚踝、鞋子与低矮障碍物，绝不漏扫撞人
-            'max_height': 1.2,        # 切片上限 1.2m，覆盖常见货架/人腿高度
+            'min_height': 0.20,       # ★ 机体系 base_link z：地面 +0.20m 以上（彻底切除地面 20cm 以下的弧形扫地虚假障碍物！）
+            'max_height': 1.60,       # ★ 机体系 base_link z：地面 +1.60m，即 AGV 顶部高度上限
             'angle_min': -3.1415926,  # 全周 360° 扫描
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,  # 角分辨率约 0.5°
@@ -277,20 +297,22 @@ def generate_launch_description():
     )
 
     # ============ 雷达自遮挡过滤器（两种模式都启动） ============
-    # 剔除 base_link 系下车体自身、前货叉及叉上载货（>0.10m 进入切片部分）的反射点，
-    # 输出干净的 /scan_filtered
-    # 过滤区域：x∈[-0.35, 1.60]m（车尾到货叉叉尖，含 5cm 余量），y∈[-0.35, 0.35]m（车宽 0.7m）
+    # 剔除 base_link 系下车体自身、尾部货叉及叉上载货（切片降到地面 0.20m 后，
+    # 举升的托盘/货物会进入扫描层）的反射点，输出干净的 /scan_filtered
+    # 过滤区域：x∈[-1.65, 1.60]m（货叉叉尖/托盘尾端 ~-1.45m + 20cm 余量 → 车头），
+    #           y∈[-0.45, 0.45]m（0.8m 托盘 + 余量）
     # ⚠️ x_min/x_max 必须完全覆盖 nav2_params.yaml 全局 footprint（[-0.30, 1.60]），
     #    否则车体/货物反射点落在 footprint 内会被标为障碍并膨胀，导致"自身碰撞"卡死
+    # ⚠️ 该盒同时遮掉车后感知：载货时车后才需要此盒，空叉(≤0.15m)本就在切片层以下不可见
     laserscan_filter = Node(
         package='diuniu_base',
         executable='laserscan_filter',
         name='laserscan_filter',
         parameters=[{
-            'x_min': -0.35,
+            'x_min': -1.65,
             'x_max': 1.60,
-            'y_min': -0.35,
-            'y_max': 0.35,
+            'y_min': -0.45,
+            'y_max': 0.45,
             'laser_x_offset': 0.0,
             'laser_y_offset': 0.0
         }],
@@ -311,6 +333,7 @@ def generate_launch_description():
         filter_mask_server,
         costmap_filter_info_server,
         lifecycle_manager_keepout,
+        cloud_level,
         pointcloud_to_laserscan,
         laserscan_filter
     ])

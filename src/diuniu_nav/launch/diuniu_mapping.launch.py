@@ -72,20 +72,36 @@ def generate_launch_description():
         parameters=[{'robot_description': robot_desc, 'use_sim_time': use_sim_time}]
     )
 
-    # 5. 3D 点云 → 2D 激光切片（参数与 diuniu_nav.launch.py 保持一致，改动请两边同步）
+    # 5. 点云水平补偿（参数与 diuniu_nav.launch.py 保持一致，改动请两边同步）
+    #    消除桅杆摆动 roll/pitch，防止建图时切片层被姿态抖动污染
+    cloud_level = Node(
+        package='diuniu_base',
+        executable='cloud_level',
+        name='cloud_level_node',
+        parameters=[{
+            'cloud_in': '/cloud_registered_body',
+            'cloud_out': '/cloud_leveled',
+            'odom_topic': '/odom',
+        }],
+        output='screen'
+    )
+
+    # 6. 3D 点云 → 2D 激光切片（参数与 diuniu_nav.launch.py 保持一致，改动请两边同步）
+    #    ⚠️ 高度区间是【雷达系 z】（点云原点在 1.6m 高的雷达处）：
+    #       z∈[-1.40, 0.0] = 地面以上 [0.20, 1.60]m，与 2D 地图建图切片层一致
     pointcloud_to_laserscan = Node(
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
         name='pointcloud_to_laserscan',
         remappings=[
-            ('cloud_in', '/cloud_registered_body'),
+            ('cloud_in', '/cloud_leveled'),
             ('scan', '/scan'),
         ],
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.2,
-            'min_height': 0.10,
-            'max_height': 1.2,
+            'min_height': 0.20,       # 机体系 base_link z：地面 +0.20m 以上（彻底切除地面 20cm 以下的弧形扫地虚假障碍物）
+            'max_height': 1.60,       # 机体系 base_link z：地面 +1.60m
             'angle_min': -3.1415926,
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,
@@ -101,17 +117,17 @@ def generate_launch_description():
         output='screen'
     )
 
-    # 6. 雷达自遮挡过滤器：输出干净的 /scan_filtered 供 Web 端显示
-    #    参数与 diuniu_nav.launch.py 保持一致（x∈[-0.35, 1.60]，覆盖全局 footprint 含叉尖）
+    # 7. 雷达自遮挡过滤器：输出干净的 /scan_filtered 供 Web 端显示
+    #    参数与 diuniu_nav.launch.py 保持一致（x∈[-1.65, 1.60]，覆盖 footprint + 货叉载货区）
     laserscan_filter = Node(
         package='diuniu_base',
         executable='laserscan_filter',
         name='laserscan_filter',
         parameters=[{
-            'x_min': -0.35,
+            'x_min': -1.65,
             'x_max': 1.60,
-            'y_min': -0.35,
-            'y_max': 0.35,
+            'y_min': -0.45,
+            'y_max': 0.45,
             'laser_x_offset': 0.0,
             'laser_y_offset': 0.0
         }],
@@ -123,6 +139,7 @@ def generate_launch_description():
         fast_lio_launch,
         base_launch,
         robot_state_publisher_node,
+        cloud_level,
         pointcloud_to_laserscan,
         laserscan_filter
     ])
