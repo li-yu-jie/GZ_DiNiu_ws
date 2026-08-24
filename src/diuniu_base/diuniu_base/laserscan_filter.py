@@ -11,14 +11,12 @@ class LaserScanFilter(Node):
     def __init__(self):
         super().__init__('laserscan_filter')
         
-        # 默认值与 diuniu_nav.launch.py / diuniu_mapping.launch.py 保持一致：
-        # 过滤盒必须覆盖全局 footprint（x∈[-0.30, 1.60]）+ 尾部货叉/托盘载货区
-        # （货叉在后轮侧，叉尖/托盘尾端约 x=-1.45m；切片降到地面 0.20m 后载货进入扫描层）
+        # 默认值覆盖 AMR 地牛全车及两侧（x∈[-1.65, 2.60]m, y∈[-1.60, 1.60]m）
         self.declare_parameter('x_min', -1.65)
-        self.declare_parameter('x_max', 1.60)
-        self.declare_parameter('y_min', -0.45)
-        self.declare_parameter('y_max', 0.45)
-        self.declare_parameter('laser_x_offset', 0.0)  # /scan 已在 base_link 系投影，无需雷达偏移
+        self.declare_parameter('x_max', 2.60)
+        self.declare_parameter('y_min', -1.60)
+        self.declare_parameter('y_max', 1.60)
+        self.declare_parameter('laser_x_offset', 0.0)  # /scan 已在 base_link 系投影，无需二次叠加
         self.declare_parameter('laser_y_offset', 0.0)
         
         self.x_min = self.get_parameter('x_min').value
