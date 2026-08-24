@@ -55,7 +55,12 @@ amcl:
     # ⚠️ 差速运动模型：Tricycle 无严格匹配的 AMCL 模型，用差速模型近似（转向角受限，够用）
     robot_model_type: nav2_amcl::DifferentialMotionModel
     save_pose_rate: 0.5
-    set_initial_pose: false              # 不强制使用固定初始位姿；模式 A-2 首次需通过 RViz 2D Pose Estimate 给出粗位姿
+    set_initial_pose: true               # ★ 自动初始化起点姿态，无须手动在 RViz 中点击 2D Pose Estimate 即可自动触发发布 map->odom TF！
+    initial_pose:
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
     sigma_hit: 0.2                      # ★ 适度放宽至 0.2：兼顾匹配精度与粒子收敛速度，偏移后能更快找回正确位置
     update_min_d: 0.02                   # ★ 0.02m：高精平滑跟进位姿更新
     update_min_a: 0.02                   # ★ 0.02rad：高精旋转跟进更新
