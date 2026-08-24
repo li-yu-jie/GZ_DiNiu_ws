@@ -303,10 +303,10 @@ def generate_launch_description():
         name='laserscan_filter',
         parameters=[{
             'x_min': -1.65,
-            'x_max': 1.65,
-            'y_min': -0.50,
-            'y_max': 0.50,
-            'laser_x_offset': 1.215,  # ★ 1.215m：雷达相对于 base_link 的 X 轴位置，精准还原点云到车体坐标系
+            'x_max': 2.60,            # ★ 扩展至 2.60m：完全覆盖车头前罩、门架油缸、保险杠与货叉根部 (实测自遮挡点分布在 1.87m~2.50m)
+            'y_min': -0.55,           # ★ 扩展至 ±0.55m：覆盖前轮护罩与门架两侧立柱宽度
+            'y_max': 0.55,
+            'laser_x_offset': 1.215,  # ★ 1.215m：雷达相对于 base_link 的 X 轴位置
             'laser_y_offset': 0.0
         }],
         output='screen'

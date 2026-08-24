@@ -125,9 +125,9 @@ def generate_launch_description():
         name='laserscan_filter',
         parameters=[{
             'x_min': -1.65,
-            'x_max': 1.65,
-            'y_min': -0.50,
-            'y_max': 0.50,
+            'x_max': 2.60,
+            'y_min': -0.55,
+            'y_max': 0.55,
             'laser_x_offset': 1.215,
             'laser_y_offset': 0.0
         }],
