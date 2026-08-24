@@ -303,10 +303,10 @@ def generate_launch_description():
         name='laserscan_filter',
         parameters=[{
             'x_min': -1.65,
-            'x_max': 3.80,            # ★ 扩展至 3.80m：100% 精确遮挡车头前罩、门架与货叉
-            'y_min': -1.60,           # ★ 扩展至 ±1.60m：100% 物理裁切斜前 48° 方向打在地面/车侧的多重同心圆弧鬼影！
+            'x_max': 2.60,            # ★ 2.60m：完全涵盖 AMR 地牛全车长 (车后 -1.65m 至 车头货叉尖 +2.60m)
+            'y_min': -1.60,           # ★ ±1.60m：完全涵盖斜前 48° 方向扫在 AMR 地牛侧边与防护罩上的弧形点
             'y_max': 1.60,
-            'laser_x_offset': 1.215,  # ★ 1.215m：雷达相对于 base_link 的 X 轴位置
+            'laser_x_offset': 0.0,    # ★ 0.0m：pointcloud_to_laserscan target_frame 已是 base_link，无须二次叠加偏移！
             'laser_y_offset': 0.0
         }],
         output='screen'
