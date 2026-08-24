@@ -53,13 +53,10 @@ class LaserScanFilter(Node):
             x_laser = r * math.cos(angle)
             y_laser = r * math.sin(angle)
             
-            # Transform to base_link frame (if frame_id is already base_link, offset is 0.0)
-            if msg.header.frame_id == 'base_link':
-                x_base = x_laser
-                y_base = y_laser
-            else:
-                x_base = x_laser + self.laser_x_offset
-                y_base = y_laser + self.laser_y_offset
+            # LaserScan 极坐标 (r, angle) 原点始终位于物理雷达硬件中心 (laser_link, X=+1.215m)
+            # 必须加上 laser_x_offset 才能精准还原到车体中心 base_link 坐标系！
+            x_base = x_laser + self.laser_x_offset
+            y_base = y_laser + self.laser_y_offset
             
             # Check if point falls inside the filtered bounding box (robot footprint region)
             if self.x_min <= x_base <= self.x_max and self.y_min <= y_base <= self.y_max:

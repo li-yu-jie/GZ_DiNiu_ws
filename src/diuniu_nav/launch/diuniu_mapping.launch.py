@@ -106,7 +106,7 @@ def generate_launch_description():
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,
             'scan_time': 0.1,
-            'range_min': 0.15,
+            'range_min': 0.50,
             'range_max': 50.0,
             'use_inf': True,
             'inf_epsilon': 1.0,
@@ -125,10 +125,10 @@ def generate_launch_description():
         name='laserscan_filter',
         parameters=[{
             'x_min': -1.65,
-            'x_max': 1.60,
-            'y_min': -0.45,
-            'y_max': 0.45,
-            'laser_x_offset': 0.0,
+            'x_max': 1.65,
+            'y_min': -0.50,
+            'y_max': 0.50,
+            'laser_x_offset': 1.215,
             'laser_y_offset': 0.0
         }],
         output='screen'
