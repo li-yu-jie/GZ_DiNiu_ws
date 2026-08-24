@@ -279,7 +279,7 @@ def generate_launch_description():
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.2,   # ★ 放宽至 0.2s：FAST-LIO 10Hz 发布时自然抖动 ~100ms，0.05s 容忍度过严导致频繁丢帧警告
-            'min_height': -1.30,      # ★ 雷达系 z（原点在 1.6m 高度）：地面 +0.30m（切除地面 30cm 以下光斑杂波）
+            'min_height': -0.80,      # ★ 雷达系 z（原点在 1.6m 高度）：地面 +0.80m（彻底切除地面低角度弧形扫地环光斑与下视杂波！）
             'max_height': 0.0,        # ★ 雷达系 z（原点在 1.6m 高度）：地面 +1.60m（即雷达本身高度上限）
             'angle_min': -3.1415926,  # 全周 360° 扫描
             'angle_max': 3.1415926,

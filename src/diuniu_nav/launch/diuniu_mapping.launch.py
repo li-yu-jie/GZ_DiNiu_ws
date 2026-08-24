@@ -100,7 +100,7 @@ def generate_launch_description():
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.2,
-            'min_height': -1.30,      # 雷达系 z（原点在 1.6m）：地面 +0.30m
+            'min_height': -0.80,      # 雷达系 z（原点在 1.6m）：地面 +0.80m
             'max_height': 0.0,        # 雷达系 z（原点在 1.6m）：地面 +1.60m（雷达本身高度上限）
             'angle_min': -3.1415926,
             'angle_max': 3.1415926,
