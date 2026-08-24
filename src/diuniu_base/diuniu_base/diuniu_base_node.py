@@ -59,6 +59,7 @@ class DiuNiuBaseNode(Node):
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
         self.pub_wheel_odom = self.create_publisher(Odometry, 'wheel_odom', 10)
         self.pub_imu = self.create_publisher(Imu, 'imu/data', 10)
+        self.pub_imu2 = self.create_publisher(Imu, 'imu2/data', 10)
         self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         self.sub_cmd_vel_joy = self.create_subscription(Twist, 'cmd_vel_joy', self.cmd_vel_joy_callback, 10)
         
@@ -442,6 +443,24 @@ class DiuNiuBaseNode(Node):
         imu.angular_velocity_covariance[0] = -1.0
         imu.linear_acceleration_covariance[0] = -1.0
         self.pub_imu.publish(imu)
+        self.pub_imu2.publish(imu)
+
+        # 3. 每 2 秒限频打印一次 IMU2 的四元数与解算出的欧拉角 (Roll, Pitch, Yaw)
+        sinr_cosp = 2.0 * (qw * qx + qy * qz)
+        cosr_cosp = 1.0 - 2.0 * (qx * qx + qy * qy)
+        roll = math.degrees(math.atan2(sinr_cosp, cosr_cosp))
+
+        sinp = 2.0 * (qw * qy - qz * qx)
+        pitch = math.degrees(math.asin(sinp)) if abs(sinp) < 1.0 else math.degrees(math.copysign(math.pi / 2.0, sinp))
+
+        siny_cosp = 2.0 * (qw * qz + qx * qy)
+        cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+        yaw = math.degrees(math.atan2(siny_cosp, cosy_cosp))
+
+        self.get_logger().info(
+            f"🧭 [IMU2 反馈] 四元数: [w={qw:.4f}, x={qx:.4f}, y={qy:.4f}, z={qz:.4f}] | 欧拉角: Roll={roll:.2f}°, Pitch={pitch:.2f}°, Yaw={yaw:.2f}°",
+            throttle_duration_sec=2.0
+        )
 
     def destroy_node(self):
         self.is_running = False
