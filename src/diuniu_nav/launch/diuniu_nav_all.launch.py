@@ -40,8 +40,8 @@ def generate_launch_description():
     use_ekf = LaunchConfiguration('use_ekf')
     declare_use_ekf = DeclareLaunchArgument(
         'use_ekf',
-        default_value='false',
-        description='false=默认直接由 FAST-LIO 高精 SLAM 发布 odom->base_link 实时 TF 坐标（保证 RViz2 车身随动）；true=开启 EKF 融合'
+        default_value='true',
+        description='true=默认开启 EKF 多源融合（融合轮式里程计 /wheel_odom + 底盘 /imu2/data 绝对姿态，统一发布 30Hz 高频 odom->base_link TF）'
     )
 
     # 1. 启动 Mid360 雷达驱动
