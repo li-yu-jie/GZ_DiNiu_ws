@@ -55,51 +55,45 @@ class CloudLevelNode(Node):
         self.declare_parameter('cloud_in', '/cloud_registered_body')
         self.declare_parameter('cloud_out', '/cloud_leveled')
         self.declare_parameter('odom_topic', '/odom')
-        self.declare_parameter('max_angle_deg', 15.0)  # 超过则认为 FAST-LIO 发散，直通不补偿
-        self.declare_parameter('sync_slop', 0.05)      # 点云与姿态的时间戳配对容差(s)
+        self.declare_parameter('max_angle_deg', 15.0)
 
         cloud_in = self.get_parameter('cloud_in').value
         cloud_out = self.get_parameter('cloud_out').value
         odom_topic = self.get_parameter('odom_topic').value
         self.max_angle = np.deg2rad(self.get_parameter('max_angle_deg').value)
-        slop = self.get_parameter('sync_slop').value
 
+        self.latest_R_c = np.eye(3, dtype=np.float32)
         self.pub = self.create_publisher(PointCloud2, cloud_out, 10)
 
-        cloud_sub = message_filters.Subscriber(self, PointCloud2, cloud_in)
-        odom_sub = message_filters.Subscriber(self, Odometry, odom_topic)
-        self.ts = message_filters.ApproximateTimeSynchronizer(
-            [cloud_sub, odom_sub], queue_size=10, slop=slop)
-        self.ts.registerCallback(self.callback)
+        self.sub_odom = self.create_subscription(Odometry, odom_topic, self.odom_callback, 10)
+        self.sub_cloud = self.create_subscription(PointCloud2, cloud_in, self.cloud_callback, 10)
 
         self.get_logger().info(
-            f'cloud_level_node: {cloud_in} + {odom_topic}(姿态) → {cloud_out}，'
-            f'补偿阈值 ±{np.rad2deg(self.max_angle):.1f}°')
+            f'cloud_level_node: 高频无丢帧点云姿态实时水平补偿 {cloud_in} + {odom_topic} → {cloud_out}')
 
-    def callback(self, cloud_msg, odom_msg):
+    def odom_callback(self, odom_msg):
         q = odom_msg.pose.pose.orientation
         R_wb = quat_to_R(q.w, q.x, q.y, q.z)
 
-        # 姿态健康检查：roll/pitch 超限说明 FAST-LIO 可能发散，直通不补偿
         roll = np.arctan2(R_wb[2, 1], R_wb[2, 2])
         pitch = np.arcsin(np.clip(-R_wb[2, 0], -1.0, 1.0))
         if abs(roll) > self.max_angle or abs(pitch) > self.max_angle:
-            self.get_logger().warn(
-                f'姿态异常 roll={np.rad2deg(roll):.1f}° pitch={np.rad2deg(pitch):.1f}°，'
-                f'本帧不补偿直通', throttle_duration_sec=2.0)
-            self.pub.publish(cloud_msg)
             return
 
-        # 补偿旋转：只保留 yaw 的 R_yawᵀ · R_wb → 消除 roll/pitch
         yaw = np.arctan2(R_wb[1, 0], R_wb[0, 0])
         cy, sy = np.cos(-yaw), np.sin(-yaw)
         Rz_inv = np.array([[cy, -sy, 0.0], [sy, cy, 0.0], [0.0, 0.0, 1.0]])
-        R_c = (Rz_inv @ R_wb).astype(np.float32)
+        self.latest_R_c = (Rz_inv @ R_wb).astype(np.float32)
 
+    def cloud_callback(self, cloud_msg):
         pts = point_cloud2.read_points_numpy(
             cloud_msg, field_names=('x', 'y', 'z'), skip_nans=True)
+        if pts.size == 0:
+            self.pub.publish(cloud_msg)
+            return
+
         arr = np.asarray(pts, dtype=np.float32).reshape(-1, 3)
-        leveled = arr @ R_c.T
+        leveled = arr @ self.latest_R_c.T
 
         out = point_cloud2.create_cloud_xyz32(cloud_msg.header, leveled)
         self.pub.publish(out)
