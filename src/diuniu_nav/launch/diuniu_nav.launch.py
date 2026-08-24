@@ -279,8 +279,8 @@ def generate_launch_description():
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.2,   # ★ 放宽至 0.2s：FAST-LIO 10Hz 发布时自然抖动 ~100ms，0.05s 容忍度过严导致频繁丢帧警告
-            'min_height': -1.40,      # ★ 雷达系 z（原点在 1.6m 高度）：地面 +0.20m（切除地面 20cm 以下光斑）
-            'max_height': -0.40,      # ★ 雷达系 z（原点在 1.6m 高度）：地面 +1.20m（彻底截断 1.2m 以上天花板/顶棚管道/门梁下压产生的鬼影！）
+            'min_height': -1.40,      # ★ 雷达系 z（原点在 1.6m 高度）：地面 +0.20m（切除地面 20cm 以下光斑杂波）
+            'max_height': 0.0,        # ★ 雷达系 z（原点在 1.6m 高度）：地面 +1.60m（即雷达本身高度上限，切除 1.6m 以上的天花板与顶棚）
             'angle_min': -3.1415926,  # 全周 360° 扫描
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,  # 角分辨率约 0.5°
