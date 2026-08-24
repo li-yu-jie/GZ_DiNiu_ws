@@ -126,8 +126,8 @@ def generate_launch_description():
         parameters=[{
             'x_min': -1.65,
             'x_max': 3.80,
-            'y_min': -0.65,
-            'y_max': 0.65,
+            'y_min': -1.60,
+            'y_max': 1.60,
             'laser_x_offset': 1.215,
             'laser_y_offset': 0.0
         }],
