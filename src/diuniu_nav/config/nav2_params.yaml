@@ -170,38 +170,33 @@ controller_server:
     #    位姿更新，单次更新若跳变 ≥3° 会反复击穿判定窗 → 表现为"到了又重规划"。
     #    若实车出现该现象，按顺序尝试：update_min_a→0.05 / beam_skip_threshold→0.3 / 末段局部伺服
     general_goal_checker:
-      stateful: true                    # ★ 必须保持 true：xy 一旦满足即锁存，之后只盯 yaw，防位姿抖动反复
+      stateful: true                    # ★ 保持 true：xy 一旦满足即锁存，只盯 yaw
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.15           # ★ 15cm = 0.15m：位置精度收紧
-      yaw_goal_tolerance: 0.0175        # ★ 1° = 0.0175rad：插货高精度对齐判定
+      xy_goal_tolerance: 0.15           # ★ 15cm 位置精度
+      yaw_goal_tolerance: 0.05         # ★ 放宽至 0.05rad (约 2.8°)，避免定位微小抖动导致末端反复无休止微调！
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.6           # ★ 与 velocity_smoother max_velocity.x 严格对齐！此前 0.8 被 smoother 默认 0.5 静默截断，w 不按比例缩 → alpha=atan(wL/v) 等效 1.6× 转向增益，画龙摆动的根因
-      # ⚠️ 已开启 use_velocity_scaled_lookahead_dist：实际预瞄 = v × lookahead_time，
-      #    钳在 [min_lookahead_dist, max_lookahead_dist] = [1.3, 1.5]m（0.6m/s × 2.5s = 1.5m）。
-      #    下面的 lookahead_dist 仅在关闭速度缩放时才生效，当前为不生效的兜底值。
+      desired_linear_vel: 0.6           # ★ 与 velocity_smoother max_velocity.x 严格对齐
       lookahead_dist: 1.5
-      min_lookahead_dist: 1.3          # ★ 提至 1.3m = 物理轴距！纯追踪预瞄 < 轴距即欠稳定（低速/过弯 0.25m/s 时钳在此值）；1.3m 仍可跟踪 1.3m 最小转弯半径
-      max_lookahead_dist: 1.8          # ★ 上限安全帽：巡航实算值 1.5m，留 0.3m 余量；必须 > 局部 footprint 前边界 1.60m，预瞄点落入车身轮廓内会破坏纯追踪几何
-      lookahead_time: 2.5              # 2.5s: 巡航 0.6m/s → lookahead=1.5m（稳定区）；弯道 0.25m/s → 0.625m 钳到 1.3m min
+      min_lookahead_dist: 1.3          # ★ 提至 1.3m = 物理轴距！
+      max_lookahead_dist: 1.8          # ★ 上限 1.8m
+      lookahead_time: 2.5
       use_velocity_scaled_lookahead_dist: true
-      min_approach_linear_velocity: 0.15        # ★ 0.05→0.15：末端爬行 5cm/s 导致每次修正"动作太小"半天拧不动；0.15m/s 微调果断（max_decel -1.0 下制动距离仅 1.1cm，安全）
-      approach_velocity_scaling_dist: 0.5       # ★ 1.0→0.5：减速区收窄到距目标 0.5m 内，避免提前爬行拉长对位时间
-      # 碰撞检测：减少前瞻预测时间，防止长车身在直角弯拐弯时把侧面墙壁投影误判为碰撞
+      min_approach_linear_velocity: 0.15
+      approach_velocity_scaling_dist: 0.5
       use_collision_detection: true
-      max_allowed_time_to_collision_up_to_carrot: 0.4 # ★ 0.2→0.4s！0.2s 巡航 0.6m/s 只看 12cm，而 max_decel=-1.0 刹停需 18cm+控制/标记延迟，物理上刹不住 → 正面撞墙；0.4s 覆盖 24cm 制动距离。转弯扫掠角 0.8rad/s×0.4s≈18°，若直角弯虚警复发再回调 0.3（勿低于 0.3）
-      # 规则化速度缩放：结合大预瞄与拐大向，弯道保持 0.25m/s 高速顺畅过弯
+      max_allowed_time_to_collision_up_to_carrot: 0.4
       use_regulated_linear_velocity_scaling: true
-      regulated_linear_scaling_min_speed: 0.25   # ★ 弯道过弯速度提升至 0.25m/s (25cm/s)
-      regulated_linear_scaling_min_radius: 1.5   # ★ 增大至 1.5m！因为叉车转弯半径规划为 1.3m。当探测到转弯半径 < 1.5m 时强制小车平稳降速至 0.25m/s（降速后预瞄收缩至 0.6m，从而能打满舵急转弯，防止冲出跑道撞外墙！）
+      regulated_linear_scaling_min_speed: 0.25
+      regulated_linear_scaling_min_radius: 1.5
       use_cost_regulated_linear_velocity_scaling: true
-      cost_scaling_dist: 0.8             # ★ 扩大探测距离至 0.8m，提早感知内墙壁的存在
+      cost_scaling_dist: 0.8
       cost_scaling_gain: 10.0
-      inflation_cost_scaling_factor: 3.5         # 注意：此项只在靠近高代价区时降低线速度（不控制方向！RPP 纯追踪永远只追预瞄点，无侧向避障能力）。贴墙时自动降速，配合全局 V 谷居中路径实现切外弯
-      use_rotate_to_heading: true   # ★ 开启自转对齐，允许在起点/终点进行原地自转修正，提高到点对位速度
-      rotate_to_heading_yaw_limit: 1.0 # ★ 限制大偏角原地旋转，循迹过程中不自转
-      rotate_to_heading_angular_vel: 0.8 # ★ 原地旋转角速度 0.8 rad/s，对齐并留有平滑器上限（1.0）余量
+      inflation_cost_scaling_factor: 3.5
+      use_rotate_to_heading: false   # ★ 三轮 Tricycle 无法原地自转，禁用自转对齐，防末端强行旋转打死方向盘
+      rotate_to_heading_yaw_limit: 1.0
+      rotate_to_heading_angular_vel: 0.8
       # ★ 允许倒车（插货对位刚需）：近点过冲/航向偏差可倒车修正，不再只能绕 1.3m 大圈。
       #    安全性由 track_unknown_space=true 保证：只允许倒入雷达扫过且为空的区域
       allow_reversing: true
@@ -347,7 +342,7 @@ planner_server:
       non_straight_penalty: 2.2        # ★ 提高至 2.2：重罚转向段，规划器偏好"先摆正车身再直穿门/直行道"，杜绝斜角进门导致叉尖扫门框的几何死局
       cost_penalty: 2.5                # ★ 折中 2.5：3.5 时窄走廊里逐个躲避墙包代价场导致路径蛇形、方向盘左右打；2.5 保留"开阔区绕外不抄近道"的效果，又不对微小代价噪点过度反应
       use_final_approach_orientation: false # ★ 关键参数：末端路径不强行甩尾匹配目标角度
-      minimum_turning_radius: 0.35       # ★ 设为 0.35m！避免规划器按 1.3m 轴距在末端画出半径 1.3m 的甩尾膨胀弧线（消灭红线"尖尖"的根本），到点后由 RPP 90° 原地自转对齐 1° 航向
+      minimum_turning_radius: 1.30       # ★ 设为 1.30m！匹配地牛 AGV 1.3m 物理轴距与 75° 最大打角物理转弯半径，禁止规划器出 0.35m 无法物理执行的折线！
       lookup_table_size: 20.0          # 启发式查找表大小 (20m)
       cache_obstacle_heuristic: false  # 是否缓存障碍物启发式地图
       debug_visualizations: false     # 关闭调试点云发布以节省 CPU
@@ -391,15 +386,6 @@ velocity_smoother:
     velocity_timeout: 1.0              # 控制指令超时时间 1.0s (超过后降速归零)
 
 # ---------- 碰撞监测器：独立于代价地图的最后安全防线（急停层） ----------
-# ★ 为什么必须订阅原始 /scan 而不是 /scan_filtered：
-#   自遮挡过滤盒 (x∈[-0.35,1.60], y∈[-0.35,0.35]) 与 footprint 前边界 1.60m 完全重合，
-#   墙贴上/贴近车头时回波落入盒内被置 inf，且 inf_is_valid=true 会反向清除墙栅格
-#   → 撞上的瞬间墙从代价地图中消失，控制器以为前方畅通继续给油（"撞墙不停"的根因）。
-#   collision_monitor 直接看原始扫描，车头前 2~18cm 条带内出现 ≥3 个点立即硬停。
-# 接线：controller_server/behavior_server → cmd_vel_nav → collision_monitor → cmd_vel_cm
-#       → velocity_smoother → cmd_vel（见 diuniu_navigation_launch.py）
-# ⚠️ 约束：货叉在后轮侧，插货对位需倒车贴近货架，故**尾部不加 Stop 多边形**；
-#   FrontStop 触发后 cmd_vel 被压为 0（含倒车），导航目标会因无法恢复而中止，需人工重新下发
 collision_monitor:
   ros__parameters:
     use_sim_time: false
@@ -414,8 +400,8 @@ collision_monitor:
     polygons: ["FrontStop", "FrontSlowdown"]
     FrontStop:
       type: "polygon"
-      # 车头保险杠(1.60m)前方 2~18cm 硬停条带；起点 1.62 避开过滤盒边缘与车头自身结构点
-      points: [1.62, -0.34, 1.62, 0.34, 1.78, 0.34, 1.78, -0.34]
+      # 车头保险杠(1.60m)前方 5~25cm 硬停条带；起点 1.65 避开 1.60m 车头与桅杆微晃误差
+      points: [1.65, -0.34, 1.65, 0.34, 1.85, 0.34, 1.85, -0.34]
       action_type: "stop"
       max_points: 3                      # 条带内 ≥3 个回波点才判定，抗单点噪声（Humble 版参数名为 max_points）
       visualize: true
