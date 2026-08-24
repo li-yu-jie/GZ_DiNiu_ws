@@ -81,9 +81,11 @@ class CloudLevelNode(Node):
             return
 
         yaw = np.arctan2(R_wb[1, 0], R_wb[0, 0])
-        cy, sy = np.cos(-yaw), np.sin(-yaw)
-        Rz_inv = np.array([[cy, -sy, 0.0], [sy, cy, 0.0], [0.0, 0.0, 1.0]])
-        self.latest_R_c = (Rz_inv @ R_wb).astype(np.float32)
+        cy, sy = np.cos(yaw), np.sin(yaw)
+        Rz = np.array([[cy, -sy, 0.0], [sy, cy, 0.0], [0.0, 0.0, 1.0]])
+        # ★ 正确构造重力对齐旋转矩阵 R_level = R_wb.T @ Rz，精确消除俯仰(pitch)与横滚(roll)倾斜，
+        #    防止加速度前冲/低头时把地面点拉入切片区间造成红色同心圆环鬼影！
+        self.latest_R_c = (R_wb.T @ Rz).astype(np.float32)
 
     def cloud_callback(self, cloud_msg):
         pts = point_cloud2.read_points_numpy(
