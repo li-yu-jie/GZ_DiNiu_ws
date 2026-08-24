@@ -100,8 +100,8 @@ def generate_launch_description():
         parameters=[{
             'target_frame': 'base_link',
             'transform_tolerance': 0.2,
-            'min_height': 0.20,       # 机体系 base_link z：地面 +0.20m 以上（彻底切除地面 20cm 以下的弧形扫地虚假障碍物）
-            'max_height': 1.60,       # 机体系 base_link z：地面 +1.60m
+            'min_height': -1.40,      # 雷达系 z（原点在 1.6m）：地面 +0.20m
+            'max_height': -0.40,      # 雷达系 z（原点在 1.6m）：地面 +1.20m
             'angle_min': -3.1415926,
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,
