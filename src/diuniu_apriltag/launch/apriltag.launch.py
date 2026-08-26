@@ -56,9 +56,9 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'tag_size',
-            default_value='0.0941',
+            default_value='0.18',
             description='AprilTag 黑色方块外缘边长 (m)，不含白色留白边。'
-                        '2026-08-22 三点卷尺现场标定值 94.1mm。'
+                        '2026-08-26 换用 18cm 大码（远距离识别）。'
                         '注意：tag0 的 TF 尺度以 config/apriltag.yaml 的 tag.sizes 为准'
         ),
 
@@ -133,7 +133,20 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 5. RViz 可视化（可选）：相机画面 + tag0 坐标轴叠加
+        # 5. 静态 TF：world → camera_optical_frame（单位变换）
+        #    否则相机坐标系只在识别到码时才出现在 TF 树里，
+        #    RViz Camera 显示会因坐标系缺失报 Error 黑屏（时好时坏的根因）。
+        #    装车做完外参后，改由机器人 TF 树提供 base_link→camera_optical_frame。
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            name='world_to_camera_tf',
+            arguments=['0', '0', '0', '0', '0', '0',
+                       'world', LaunchConfiguration('camera_frame')],
+            output='screen',
+        ),
+
+        # 6. RViz 可视化（可选）：相机画面 + tag0 坐标轴叠加
         Node(
             package='rviz2',
             executable='rviz2',
