@@ -239,9 +239,11 @@ ros2 launch diuniu_base diuniu_base.launch.py
 
 ### 2. 多源传感器 EKF 融合与 TF 解耦
 
-- **配置路径**：`src/diuniu_nav/config/ekf.yaml`。
+- **配置路径**：`src/diuniu_n10_nav/config/ekf.yaml` 与 `src/diuniu_n10_nav/config/nav2_params.yaml`。
 - **TF 解耦**：通过 `publish.tf_en` 参数，在开启 EKF（`use_ekf:=true`）时主动关闭 FAST-LIO 的 `odom → base_link` TF 广播，避免 TF 冲突。
 - **速度话题同步**：`bt_navigator` 的 `odom_topic` 由 launch 按模式自动注入——`use_ekf:=false` 时为 `/odom`（FAST-LIO 原始输出），`use_ekf:=true` 时为 `/odometry/filtered`（EKF 融合输出），保证速度估计与 TF 来源一致。
+- **静止漂移根治 (定海神针)**：轮式里程计 (`odom0`) 必须融合角速度 `vyaw`。在车辆静止时，轮式里程计输出极为确定的零角速度，EKF 会利用该零角速度锚定航向，强力抵消底盘 BNO085 IMU 在室内的低频地磁缓慢漂移，彻底解决静止时由于 IMU 漂移导致的 RViz 激光点云歪斜问题。
+- **AMCL 运动噪声与更新平衡**：因为 EKF 在静止时已完全锚定，AMCL 的运动噪声（`alpha1~5`）被严格下调至 `0.05`。同时 AMCL 更新门槛恢复敏锐（`update_min_d: 0.05m`, `update_min_a: 0.10rad`）。这样不仅避免了高噪声带来的"梦游式"发散平移漂移，还能让 AMCL 对正常运动中产生的位移快速响应。
 
 ### 3. 雷达自遮挡过滤器与双级 footprint 设计
 

@@ -37,7 +37,7 @@ ekf_filter_node:
     odom0_config: [false, false, false,   # x, y, z
                    false, false, false,   # roll, pitch, yaw
                    true,  false, false,   # vx, vy, vz
-                   false, false, false,   # vroll, vpitch, vyaw (★ 改为 false，只信 IMU)
+                   false, false, true,    # vroll, vpitch, vyaw (★ 2026-08-31 恢复为 true：必须融合轮式里程计的角速度！静止时轮子输出极其稳定的 wz=0，能像锚一样死死拉住 IMU，防止静止飘移！)
                    false, false, false]   # ax, ay, az
     odom0_queue_size: 10
     odom0_nodelay: true
