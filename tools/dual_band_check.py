@@ -1,13 +1,14 @@
-import rclpy, math, time
+import rclpy, math, time, sys
 import numpy as np
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from tf2_ros import Buffer, TransformListener
-from PIL import Image
+from common import load_map, quat_yaw
 
-MAP_PGM = "/home/y/GZ_DiNiu_ws/src/diuniu_nav/maps/map.pgm"
-ORIGIN = (-15.8, -52.4)
-RES = 0.05
+# 地图 origin/resolution 从 map.yaml 现读（2026-08-27 重录后 origin=[-29.4,-53,0]），勿再硬编码
+img, ORIGIN, RES = load_map()
+H, W = img.shape
+occ = img < 100
 
 rclpy.init()
 node = rclpy.create_node("dual_band_check")
@@ -22,16 +23,15 @@ t1 = time.time()
 while time.time() - t1 < 3.0:
     rclpy.spin_once(node, timeout_sec=0.1)
 cloud = holder["msg"]
+if cloud is None:
+    print("超时无数据，请检查上游节点是否在发 /cloud_leveled")
+    sys.exit(1)
 tf = tf_buf.lookup_transform("map", "base_link", rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=2.0))
 tx, ty = tf.transform.translation.x, tf.transform.translation.y
-q = tf.transform.rotation
-yaw = math.atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z))
+yaw = quat_yaw(tf.transform.rotation)
 print("机器人: x=%.2f y=%.2f yaw=%.1f°" % (tx, ty, math.degrees(yaw)))
 
 arr = np.asarray(point_cloud2.read_points_numpy(cloud, field_names=("x","y","z"), skip_nans=True), dtype=np.float32).reshape(-1, 3)
-img = np.array(Image.open(MAP_PGM))
-H, W = img.shape
-occ = img < 100
 
 cy_, sy_ = math.cos(yaw), math.sin(yaw)
 def band_match(zlo, zhi, label):
@@ -52,8 +52,11 @@ def band_match(zlo, zhi, label):
     print("%s: %d 点, 命中地图 %.1f%%, 距离 %.1f~%.1fm" % (label, len(row), 100.0*hit/max(len(row),1), r.min() if len(r) else -1, r.max() if len(r) else -1))
     return mx, my, ok
 
-band_match(-1.40, 0.0,  "新带 z[-1.40, 0.0] (地面0.2~1.6m)")
-band_match( 0.10, 1.20, "旧带 z[+0.10,+1.20] (地面1.7~2.8m)")
-band_match( 1.20, 2.40, "头顶 z[+1.20,+2.40] (地面2.8~4.0m)")
-band_match(-1.65,-1.40, "地面带 z[-1.65,-1.40] (地面0~0.2m)")
+# 切片带 z∈[0.20, 1.20]：2026-08-28 起 /cloud_leveled 为真实 base_link（z=0 在地面），
+# z 即地面高度。（此前 z 原点在雷达：8-27 雷达移 0.66m 正装后切片带为 z∈[-0.46,0.54]，
+# 更早 1.6m 桅杆时代为 z∈[-1.40,0.0]，均已过期）
+band_match( 0.20, 1.20,  "切片带 z[0.20, 1.20] (地面0.2~1.2m)")
+band_match( 1.20, 1.90,  "上带 z[+1.20,+1.90] (地面1.2~1.9m)")
+band_match( 1.90, 3.10,  "头顶 z[+1.90,+3.10] (地面1.9~3.1m)")
+band_match( 0.00, 0.20,  "地面带 z[ 0.00, 0.20] (地面0~0.2m)")
 node.destroy_node(); rclpy.shutdown()

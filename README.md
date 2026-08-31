@@ -11,8 +11,8 @@
 | **车型结构**           | Tricycle (前轮驱动 + 前轮转向) | 运动学控制点 `base_link` 定义在后轴中心                        |
 | **物理轴距 ($L$)**   | $1.30 \text{ m}$             | 前轮与后轴中心线距离                                             |
 | **车身半宽 ($W/2$)** | $0.35 \text{ m}$             | 车身物理总宽$0.70 \text{ m}$                                   |
-| **整车车长**           | 车身与货叉物理总长 $1.90 \text{ m}$ | 车尾 $x = -0.30\text{m}$，车身与货叉前边界 $x = 1.60\text{m}$ |
-| **传感器配置**         | Livox Mid360 3D 雷达           | 位于 `base_link` 前方 $1.215\text{m}$、上方 $0.60\text{m}$ |
+| **整车车长**           | 车身物理总长 $1.90 \text{ m}$（不含车尾货叉） | 车头（雷达/桅杆端）$x = +1.60\text{m}$，车尾 $x = -0.30\text{m}$；货叉在车尾 $-x$ 侧伸出（载货自遮挡屏蔽盒至 $x=-1.65\text{m}$，2026-08-19 实车确认），插货由 tag_align 相机引导倒车完成 |
+| **传感器配置**         | Livox Mid360 3D 雷达           | 位于 `base_link` 前方 $1.215\text{m}$、上方 $0.66\text{m}$（正装） |
 | **底盘通信**           | 串口 `/dev/ttyUSB0`          | 波特率 `460800`                                                |
 
 ---
@@ -20,7 +20,6 @@
 ## 🚀 快速启动指南
 
 ### 1. 环境准备
-
 每次在新终端运行前，请先初始化 ROS 2 环境：
 
 ```bash
@@ -32,6 +31,9 @@ source install/setup.bash
 ### 2. 编译构建规范
 
 ```bash
+# ⚠️ 必须在容器（ros2y）内构建！在宿主机跑 colcon build 会把宿主机绝对路径写进
+#    CMakeCache 和 build/install 软链，容器内软链全部悬空（ament_python 包直接报
+#    "can't open file build/<pkg>/setup.py"），需 rm -rf build/<pkg> install/<pkg> 后重建
 # ⚠️ 必须先 cd 进工作空间！在其他目录（如家目录 ~）运行 colcon 会递归扫描整个目录树，
 #    把无关包抓进来并污染当前目录（生成 build/ install/ log/）
 cd ~/GZ_DiNiu_ws
@@ -52,6 +54,12 @@ colcon build --symlink-install --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=humb
 ros2 launch diuniu_nav diuniu_nav_all.launch.py
 ```
 
+#### 模式：手柄遥控（独立终端启动）
+
+```bash
+ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py
+```
+
 #### 常用可选启动参数
 
 | 参数名                 | 默认值    | 作用说明                                                               |
@@ -68,6 +76,81 @@ ros2 launch diuniu_nav diuniu_nav_all.launch.py use_ekf:=true
 # 关闭 AMCL，使用建图原点静态原点模式
 ros2 launch diuniu_nav diuniu_nav_all.launch.py use_relocalization:=false
 ```
+
+---
+
+## 📡 N10 雷达栈（diuniu_n10_nav，替代 Mid360 方案）
+
+**镭神 LSLiDAR N10** 2D 激光雷达（串口 230400，车头原雷达位）独立建图/导航栈，
+SLAM 用 **slam_toolbox**，定位用 **AMCL**，Nav2 参数/急停链与 Mid360 栈一致。
+驱动：`src/Lslidar_ROS2_driver`（官方 N10_V1.0 分支，直接发布 `/scan` LaserScan）。
+
+> ⚠️ 两栈**运行时二选一**，勿同时启动（同名 `/scan`、TF 冲突）。
+
+### 首次使用：固定串口名
+
+`/dev/ttyUSBx` 编号随插拔漂移。插入 N10 后识别其转串芯片：
+
+```bash
+udevadm info -q property -n /dev/ttyUSBx | grep -E "ID_VENDOR_ID|ID_MODEL_ID|ID_SERIAL"
+```
+
+将 VID:PID 填入 [src/diuniu_n10_nav/config/99-diuniu.rules](src/diuniu_n10_nav/config/99-diuniu.rules)
+的 `n10_lidar` 行（若与底盘同为 CH340 无序列号芯片，见文件内注释的处置），然后安装规则：
+
+```bash
+sudo cp src/diuniu_n10_nav/config/99-diuniu.rules /etc/udev/rules.d/
+sudo udevadm control --reload-rules && sudo udevadm trigger
+ls -l /dev/n10_lidar /dev/diuniu_chassis   # 应能看到两个符号链接
+```
+
+### 建图（slam_toolbox）
+
+> ⚠️ **启动前必查**（2026-08-31 踩坑）：容器 `/dev` 是启动时快照，重新插拔雷达后
+> `/dev/n10_lidar` 在容器内会消失，此时驱动**静默退出**（launch.log 只显示
+> "process has finished cleanly"），RViz 报 `Frame [map] does not exist`、无地图无激光点。
+> 先确认设备在容器内可见，不在就跑一次 `tools/sync_dev.sh`（宿主机执行）：
+>
+> ```bash
+> ls /dev/n10_lidar && ros2 topic hz /scan   # 启动后应有 ~10Hz
+> ```
+
+```bash
+# 终端1：N10 + 底盘 + EKF + slam_toolbox（rviz:=true 可代开 RViz）
+ros2 launch diuniu_n10_nav n10_mapping.launch.py
+
+# 终端2：手柄遥控跑全场
+ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py
+
+# 终端3：跑完后保存地图（存到 N10 包自己的 maps/，与 Mid360 地图分开）
+ros2 run nav2_map_server map_saver_cli -f ~/GZ_DiNiu_ws/src/diuniu_n10_nav/maps/map
+```
+
+### 导航（AMCL + Nav2）
+
+```bash
+ros2 launch diuniu_n10_nav n10_nav_all.launch.py
+# 换地图：ros2 launch diuniu_n10_nav n10_nav_all.launch.py map:=/path/to/map.yaml
+```
+
+预飞纪律与 Mid360 栈相同：RViz 确认**激光贴墙 + AMCL 粒子收敛**后再发目标
+（初始位姿点错会撞墙，2026-08-28 事故）。
+
+### 驱动单测 / 坐标系校准
+
+```bash
+ros2 launch diuniu_n10_nav n10_driver.launch.py serial_port:=/dev/ttyUSB1  # 规则未装时临时用
+ros2 topic hz /scan    # N10 应约 10Hz
+```
+
+N10 的 `n10_laser_link` 在 URDF 中为 (1.295, 0, 0.66)（原雷达位正前方 8cm，2026-08-31 现场确认，
+z 与 yaw 零度方向均无误）。位置若再动，URDF 与两个 launch 的 `laser_x_offset` 三处同步改。
+
+### 能力差异提醒
+
+N10 是 2D 单线雷达（约 0.66m 高扫描平面）：**低于扫描平面的障碍（托盘、叉尖、地档）不可见**，
+相对 Mid360 3D 切片方案（z∈[0.20,1.20]m 带）感知面变窄，collision_monitor 急停链
+仍工作但只对扫描平面高度的障碍生效。
 
 ---
 
@@ -127,6 +210,22 @@ ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py
   - **紧急停止**：按下 **B 键** 触发底盘硬件断电急停。
 - **手柄/Nav2 自动仲裁**：手柄按住使能键期间，底盘自动屏蔽 Nav2 的 `/cmd_vel`（日志显示 `🎮 [仲裁]`），松开 $0.5\text{s}$ 后自动交还导航控制权。手柄空闲时 `cmd_vel_joy` 话题彻底静默（只发少量补停帧），不会与导航指令交错争抢。
 - **⚠️ 限速提醒**：手柄满推 $1.2\text{ m/s}$ / $2.5\text{ rad/s}$，是 Nav2 导航限速（$0.6$ / $1.0$）的 2 倍以上，室内重载场景请谨慎满推。
+
+### 模式四：AprilTag 倒车对中（视觉辅助倒车对码头/托盘）
+
+```bash
+# 终端1：底盘驱动（若已随其他链路启动则跳过）
+ros2 launch diuniu_base diuniu_base.launch.py
+
+# 终端2：识别链 + 倒车对中节点（车会动！确认后方无障无碍再启动）
+~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_apriltag.sh align:=true
+```
+
+- 车尾相机盯住地面码，**按码中心坐标 + 码偏航角自动调整车身角度**，并按码距比例减速、**到位自动停车**（`target_z` 需现场标定，默认 2.0m 是占位值）；叉取动作仍由人完成。
+- 建议同时开手柄（模式三）：RT 随时接管、B 急停；**松手 $0.5\text{s}$ 后自动恢复倒车**。
+- 丢码 $0.5\text{s}$ 立即自动停车（绝不盲倒）；⚠️ **勿与 Nav2 同时运行**（争抢 `/cmd_vel`）。
+- 运行中暂停/恢复：`ros2 param set /tag_align enabled false` / `true`。
+- 参数与首验调参步骤（方向符号 `steer_sign`、偏航目标 `yaw_target_deg`）：[src/diuniu_apriltag/README.md](src/diuniu_apriltag/README.md) 第三节。
 
 ---
 

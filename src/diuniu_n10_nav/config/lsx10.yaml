@@ -1,0 +1,34 @@
+# =============================================================================
+# lsx10.yaml — 镭神 LSLiDAR N10 驱动参数（基于官方 lslidar_driver/params/lsx10.yaml 修改）
+#
+# 与官方默认的差异：
+#   - interface_selection: serial（串口连接；N10 串口波特率 230400 由驱动源码固定）
+#   - serial_port_: /dev/n10_lidar（udev 规则固定的符号链接，勿用 /dev/ttyUSBx
+#     —— 编号随插拔顺序漂移；规则见 config/99-diuniu.rules）
+#   - frame_id: n10_laser_link（URDF 中 N10 专用坐标系，与 Mid360 的 laser_link 区分）
+#   - lidar_name: N10
+#   - max_range: 30.0（N10 标称 25m，超出部分为噪声）
+# =============================================================================
+/lslidar_driver_node:
+  ros__parameters:
+    frame_id: n10_laser_link            # URDF 中 N10 坐标系（车头原雷达位）
+    group_ip: 224.1.1.2
+    add_multicast: false
+    device_ip: 192.168.1.200            # 串口模式下不使用，保留默认值
+    device_ip_difop: 192.168.1.102
+    msop_port: 2368
+    difop_port: 2369
+    lidar_name: N10                     # 雷达选择: M10 M10_P M10_PLUS M10_GPS N10 L10 N10_P
+    angle_disable_min: 90.0             # 角度裁剪开始值（0=不裁剪）
+    angle_disable_max: 270.0            # 角度裁剪结束值
+    min_range: 0.0                      # 接收距离下限
+    max_range: 30.0                     # ★ N10 标称 25m，留余量
+    use_gps_ts: false
+    scan_topic: /scan
+    interface_selection: serial         # ★ serial=串口 / net=网口
+    serial_port_: /dev/n10_lidar        # ★ udev 符号链接（规则见 config/99-diuniu.rules）
+    high_reflection: false
+    compensation: false
+    pubScan: true                       # ★ 直接发布 LaserScan
+    pubPointCloud2: false
+    pointcloud_topic: /lslidar_point_cloud

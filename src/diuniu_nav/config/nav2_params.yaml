@@ -2,14 +2,20 @@
 # nav2_params.yaml — 地牛叉车 Nav2 导航参数配置
 #
 # 车型：Tricycle 前驱转向三轮车（前轮驱动+转向，base_link 在后轴连线中点）
-# 整车尺寸：长 1.85m（含货叉超 2.6m）× 宽 0.7m
+# 整车几何（2026-08-28 定案）：车头前边界 +1.60m / 车尾 -0.30m / 半宽 0.35m
+# ★ +x 为车头/雷达端；货叉从车尾向前 1.20m 伸在车身范围内、车尾无伸出（用户实车确认）。
+#   本文件所有 footprint/多边形均按真实 base_link 坐标书写——2026-08-28 起
+#   /cloud_leveled 与 /scan 已是诚实的 base_link 系（cloud_level_node 完成
+#   雷达系→base_link 平移，z=0 在地面），此前全部数值隐含 1.215m 前偏。
 #
 # 关键调参记录（各项设计原因同时见 README.md「核心系统优化与调试记录」章节）：
 #   1. FollowPath 为速度缩放预瞄：lookahead = v × lookahead_time(2.5s)，
 #      实际工作区间 [1.3, 1.5]m（最高速 0.6m/s × 2.5s = 1.5m），消除低速前轮剧烈扭摆
-#   2. footprint：全局前边界 1.60m（含货叉叉尖，规划路径为叉尖留余量），
-#      局部前边界 1.60m（整车物理长度含货叉为 1.90m）；
-#      laserscan_filter 的 x_max 必须与全局 footprint 前边界 1.60 一致（覆盖载货自遮挡）
+#   2. footprint：全局 [+1.65/-0.35]×±0.40（整车+5cm 余量），
+#      局部 [+1.60/-0.30]×±0.35（整车物理轮廓=车身轮廓，含叉）；
+#      ⚠️ 货叉从车尾向前 1.20m 伸在车身范围内、车尾无伸出——勿再按"叉尖伸出
+#      车尾 -1.65"加幻影尾巴（8-28 上午的错），也别回到"叉在车头"的更早旧错
+#      laserscan_filter 屏蔽盒 [-0.35,1.65]×±0.36 为车身包络
 #   3. 代价地图障碍源为 /scan_filtered（过滤车体自遮挡后的干净扫描）
 #   4. Tricycle 不能原地自转：use_rotate_to_heading=false；
 #      但允许倒车（allow_reversing=true + REEDS_SHEPP）：插货对位/近点修正刚需，
@@ -33,17 +39,17 @@ amcl:
     alpha4: 0.05
     alpha5: 0.05
     base_frame_id: base_link
-    beam_skip_distance: 0.3              # ★ 缩紧至 0.3m！行人在车前移动时，离墙>30cm 的人体点云瞬间被 AMCL 剔除，防止运动中定位偏斜
+    beam_skip_distance: 0.5              # ★ 0.3→0.5（8-28 晚）：只有偏差>50cm 的光束才算"动态"，避免姿态微偏时把真实墙证据误剔
     beam_skip_error_threshold: 0.8
-    beam_skip_threshold: 0.2             # ★ 剔除阈值设为 0.2，强力过滤行人在车前行走穿过时的动态干扰
-    do_beamskip: true                    # ★ 开启动态人体/障碍物激光束剔除！自动忽略站在通道中央的人体
+    beam_skip_threshold: 0.3             # ★ 恢复至 0.3
+    do_beamskip: false                   # ★ 实车关闭：防止初始位姿微偏时把真实墙壁射线当动态障碍剔除，导致无法定位对齐！
     global_frame_id: map
     lambda_short: 0.1
     laser_likelihood_max_dist: 2.0
     laser_max_range: 100.0
     laser_min_range: -1.0
     laser_model_type: likelihood_field  # 似然场模型，室内结构化环境定位稳定
-    max_beams: 120                       # 每次更新使用的激光束数由 60 提升至 120，显著增强稀疏特征环境下的定位精度                       # 每次更新使用的激光束数，越大越准但越耗 CPU
+    max_beams: 360                       # ★ 120→360（8-28 晚）：3 倍光束提升周期性环境（托盘/货架）区分度，抑制"锁到错误周期"滑移；CPU 占用实测可承受
     max_particles: 5000                 # ★ 提高至 5000：更多粒子 → 更强特征稀疏环境下的定位稳定性
     min_particles: 1000                 # ★ 提高至 1000：保证最少粒子数，防止粒子匮乏导致漂移
     odom_frame_id: odom
@@ -55,15 +61,20 @@ amcl:
     # ⚠️ 差速运动模型：Tricycle 无严格匹配的 AMCL 模型，用差速模型近似（转向角受限，够用）
     robot_model_type: nav2_amcl::DifferentialMotionModel
     save_pose_rate: 0.5
-    set_initial_pose: true               # ★ 自动初始化起点姿态，无须手动在 RViz 中点击 2D Pose Estimate 即可自动触发发布 map->odom TF！
+    # ⚠️ 勿强制 set_initial_pose: true + 固定坐标！地图原点 [-29.4,-53]，固定初值
+    #    意味着"车永远从同一点位开机"，在别处开机会锁定错误位姿：map→odom 偏数米、
+    #    静态墙与现实错位，全局规划会规划穿真墙的路径。
+    #    正确流程：开机后先在 RViz 用 2D Pose Estimate 给粗位姿（或将下方坐标
+    #    改成当次实际停车位再启动）。
+    set_initial_pose: false
     initial_pose:
       x: 0.0
       y: 0.0
       z: 0.0
       yaw: 0.0
     sigma_hit: 0.2                      # ★ 适度放宽至 0.2：兼顾匹配精度与粒子收敛速度，偏移后能更快找回正确位置
-    update_min_d: 0.02                   # ★ 0.02m：高精平滑跟进位姿更新
-    update_min_a: 0.02                   # ★ 0.02rad：高精旋转跟进更新
+    update_min_d: 0.05                   # ★ 0.02→0.05m（8-28 晚）：门太松时静止也会被 odom 微噪声反复触发更新，信念沿走廊随机游走（"定位一直飘"）；0.6m/s 行驶仍 12Hz 校正
+    update_min_a: 0.10                   # ★ 0.02→0.10rad（8-28 晚）：同上；直线行驶航向校正改由 BNO085 绝对航向经 odom TF 承担，AMCL 每 5.7° 旋转校正一次足够
     # 观测模型权重：hit(命中)/short(意外近-人体)/max(超程)/rand(随机)
     z_hit: 0.85                          # ★ 主权重 0.85，强力锁定墙壁与真实地图特征
     z_max: 0.05
@@ -161,24 +172,27 @@ controller_server:
     controller_plugins: ["FollowPath"]
 
     # 进展检查：30 秒内必须移动超过 0.1m，否则判定卡死触发恢复行为
-    # ★ 5.0s→30.0s！末端 3° 对位微调是在 0.1m 半径内低速往复拧航向，5s 必然误判卡死
+    # ★ 5.0s→30.0s！末端对位微调是在 0.1m 半径内低速往复拧航向，5s 必然误判卡死
     #    → 触发 Wait 15s 恢复 → 再试 5s → 再等 15s，是"到点调整太慢"的最大元凶；
     #    30s 给足泊车式微调时间，真卡死（重载憋电机）30s 也能兜住
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.1
       movement_time_allowance: 30.0
-    # 到点判定：位置误差 ≤0.40m 且航向误差 ≤0.052rad（3°，插货对位硬指标）视为到达
-    # ★ 3° 靠"倒车微调"达成：偏角超差时 REEDS_SHEPP 会规划含倒车段的修正路径，
-    #    像汽车泊车一样多次前进/倒车把航向拧进 3° 内，末端对位耗时变长是预期行为
+    # 到点判定：位置误差 ≤0.20m 且航向误差 ≤0.1rad（5.7°）视为到达
+    # ★ 5.7° 窗靠"倒车微调"达成：偏角超差时 REEDS_SHEPP 会规划含倒车段的修正路径，
+    #    像汽车泊车一样多次前进/倒车把航向拧进窗内，末端对位耗时变长是预期行为
     # ⚠️ 瓶颈在 AMCL 航向抖动而非控制：update_min_a=0.02rad(1.1°) 意味着每次微旋都触发
-    #    位姿更新，单次更新若跳变 ≥3° 会反复击穿判定窗 → 表现为"到了又重规划"。
-    #    若实车出现该现象，按顺序尝试：update_min_a→0.05 / beam_skip_threshold→0.3 / 末段局部伺服
+    #    位姿更新，单次更新跳变 ≥3° 是例行现象——判定窗已据此放宽到 5.7°（勿收紧，见下）。
+    #    若实车仍出现"到了又重规划"，按顺序尝试：update_min_a→0.05 / beam_skip_threshold→0.3 / 末段局部伺服
     general_goal_checker:
       stateful: true                    # ★ 保持 true：xy 一旦满足即锁存，只盯 yaw
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.15           # ★ 15cm 位置精度
-      yaw_goal_tolerance: 0.0175        # ★ 严格保持 1.0° (0.0175rad) 高精度对齐判定（插货/载货高精度对位硬性要求！）
+      xy_goal_tolerance: 0.20           # ★ 20cm 位置精度
+      # ★ 5.7° (0.1rad)：勿收紧到 2°！AMCL 例行位姿修正跳动 ≥3°（见文件头与调试记录），
+      #    <3° 的窗口会在判定成功后被跳变打破 → "到了又重规划"末端振荡、任务永不终结。
+      #    插货高精度对位不归这里管——由 tag_align（相机）完成。
+      yaw_goal_tolerance: 0.1
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
@@ -188,8 +202,8 @@ controller_server:
       max_lookahead_dist: 1.8          # ★ 上限 1.8m
       lookahead_time: 2.5
       use_velocity_scaled_lookahead_dist: true
-      min_approach_linear_velocity: 0.15
-      approach_velocity_scaling_dist: 0.5
+      min_approach_linear_velocity: 0.20
+      approach_velocity_scaling_dist: 0.30
       use_collision_detection: true
       max_allowed_time_to_collision_up_to_carrot: 0.4
       use_regulated_linear_velocity_scaling: true
@@ -199,11 +213,17 @@ controller_server:
       cost_scaling_dist: 0.8
       cost_scaling_gain: 10.0
       inflation_cost_scaling_factor: 3.5
-      use_rotate_to_heading: true    # ★ 开启自转对齐：利用底盘前轮 90° 转向能力，在起点/终点大偏角时打角 90° 旋转摆正航向
-      rotate_to_heading_yaw_limit: 1.0 # 偏角 > 1.0 rad 时触发 90° 打角自转
-      rotate_to_heading_angular_vel: 0.6 # 原地旋转角速度 0.6 rad/s，对齐更精准且平稳
-      # ★ 允许倒车（插货对位刚需）：近点过冲/航向偏差可倒车修正，不再只能绕 1.3m 大圈。
-      #    安全性由 track_unknown_space=true 保证：只允许倒入雷达扫过且为空的区域
+      use_rotate_to_heading: false   # ★ 2026-08-28 起关闭：Tricycle 不能原地自转（伪自转扫掠面积大易扫墙）；
+                                     #    起点/终点大偏角改由 REEDS_SHEPP 倒车段修正（汽车泊车原理），
+                                     #    倒车已全程开放（allow_reversing=true + reverse_penalty=2.0）
+      rotate_to_heading_yaw_limit: 3.14 # 偏角限制在 180 度 (3.14 rad)，仅在反向或大偏角时自转，且不超过180度
+      # （以下两个 rotate_to_heading_* 参数在 use_rotate_to_heading=false 期间是休眠值；
+      #   若重新启用：判定窗已是 ±5.7°，0.3 rad/s 单周期 1.7°、制动滑行 ~1.0° 均远小于窗口；
+      #   历史上的 ±2° 窗时代 0.8 rad/s 会单周期 4.6°+滑行 7° 冲窗来回摇摆，勿回到那个组合）
+      rotate_to_heading_angular_vel: 0.3 # 末端对位角速度 0.3 rad/s
+      # ★ 允许倒车（2026-08-28 起全程开放，配合 planner reverse_penalty=2.0）：
+      #    目标在正后方/窄巷道时直接执行倒车段，不再只能绕 1.3m 大圈；
+      #    安全性由 track_unknown_space=true + CM 后方多边形保证：只倒入雷达扫过且为空的区域
       allow_reversing: true
 
 # ---------- 局部代价地图：静态地图 + 实时雷达避障（滚动窗口跟随车体） ----------
@@ -217,28 +237,35 @@ local_costmap:
       use_sim_time: false
       transform_tolerance: 0.5
       rolling_window: true              # 5m×5m 滚动窗口，始终覆盖车体周边
-      # ★ 未知=障碍（倒车安全前提）：未被雷达射线清扫过的区域按障碍处理，
-      #    倒车只允许倒入"扫过且为空"的区域；自车阴影区因 filter 删点无射线清扫会保持未知，
-      #    正常"前进-倒车修正"场景后方区域几秒前刚被扫过（known-free），不受影响
+      # ★ 未知=障碍（倒车安全前提之一）：未被雷达射线清扫过的区域按障碍处理，
+      #    倒车只允许倒入"扫过且为空"的区域；正常"前进-倒车修正"场景后方区域
+      #    几秒前刚被扫过（known-free），不受影响。
+      #    屏蔽盒已收紧为车身包络 [-0.35,1.65]（车尾无伸出），车尾障碍本层可见；
+      #    盒内 inf 射线清扫区（inf_is_valid=true）的动态障碍兜底靠 CM 原始 /scan 多边形
       track_unknown_space: true
       width: 5
       height: 5
       resolution: 0.05                  # 5cm 栅格分辨率
-      robot_radius: 1.64  # 后备防撞圆半径（footprint 解析失败时的兜底）：取局部 footprint 外接圆 √(1.60²+0.35²)≈1.64，勿小于此值，否则车头失去碰撞检测
-      # ★ 局部碰撞轮廓（仅车身，不含货叉）：前边界 1.60m / 后边界 -0.30m / 半宽 0.35m
-      #    叉尖(1.60m)由全局 footprint 留余量保护；局部保持车身轮廓以保证预瞄点(≥1.3m)几何合法、窄弯能力不受损
+      robot_radius: 1.64  # 后备防撞圆半径（footprint 解析失败时的兜底）：局部 footprint 外接圆 √(1.60²+0.35²)≈1.64
+      # ★ 局部碰撞轮廓 = 整车物理轮廓（含叉）：车头 +1.60m / 车尾 -0.30m / 半宽 0.35m
+      #    货叉从车尾向前 1.20m 伸在车身范围内、车尾无伸出（2026-08-28 用户实车确认），
+      #    整车轮廓即车身轮廓；RPP 倒车碰撞检查依赖本轮廓，勿再加"叉尖幻影尾巴"
       footprint: "[[1.60, 0.35], [1.60, -0.35], [-0.30, -0.35], [-0.30, 0.35]]"
-      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
-      static_layer:
-        plugin: "nav2_costmap_2d::StaticLayer"
-        map_subscribe_transient_local: true
+      plugins: ["obstacle_layer", "inflation_layer"]
       obstacle_layer:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         observation_sources: scan
+        # ★ ±10m 是有意放开：障碍源为 2D LaserScan，标记本身是二维的，高度门控无意义；
+        #    而 base_link 在 odom 系下的 z 来自 FAST-LIO/EKF，长时间运行会漂移，
+        #    窄门控（如 0.0~2.0）会因 z 漂移把所有扫描点静默滤光 → 代价地图失明。
+        min_obstacle_height: -10.0
+        max_obstacle_height: 10.0
         scan:
           topic: /scan_filtered         # ★ 使用过滤自遮挡后的扫描，勿改回 /scan
-          max_obstacle_height: 2.0
+          sensor_frame: base_link
+          min_obstacle_height: -10.0    # 同上层级：容忍 odom z 漂移，scan 为 2D 无需真实门控
+          max_obstacle_height: 10.0
           clearing: true                # 允许射线穿透清除过期障碍
           marking: true
           raytrace_max_range: 3.5       # ★ 适配 5m×5m 局部窗口 bounds，防止越界 Warning
@@ -249,7 +276,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 8.0          # ★ 指数极速衰减，确保通道中央为零代价，最大化物理可通过空间
-        inflation_radius: 0.38          # ★ 局部定位与防撞安全阈值设为 0.38m，提供 3cm 缓冲，彻底杜绝起点碰撞与刮擦！
+        inflation_radius: 0.50          # ★ 局部膨胀半径 0.50m（原 0.38 过小，自转/大弯易刮擦）
       always_send_full_costmap: false     # ★ 设为 false！只发布局部代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
 # ---------- 全局代价地图：静态地图 + 实时障碍，供全局规划 ----------
@@ -264,18 +291,17 @@ global_costmap:
       transform_tolerance: 0.5
       # ★ 未知=障碍：建图时没扫到的区域一律视为不可通行（配合 planner allow_unknown: false）
       track_unknown_space: true
-      robot_radius: 1.64   # 后备兜底：全局 footprint 外接圆 √(1.60²+0.35²)≈1.64
-      # ★ 全局规划轮廓（含货叉叉尖）：前边界 1.60m（整车含叉总长 1.90m - 后悬 0.30m）/ 后边界 -0.30m / 半宽 0.35m
-      #    laserscan_filter 的 x_max 同步为 1.60，滤掉叉上载货的自遮挡点
-      footprint: "[[1.60, 0.35], [1.60, -0.35], [-0.30, -0.35], [-0.30, 0.35]]"
-      # ★ keepout_filter 必须放在 inflation_layer 之前：禁区同样会被膨胀层外扩，彻底禁行
-      plugins: ["static_layer", "obstacle_layer", "keepout_filter", "inflation_layer"]
-      # ---------- 禁区层（Keepout Filter）：由 filter_mask_server 发布 /keepout_filter_mask ----------
-      # mask 语义：黑色(占用)=禁区，白色(空闲)=正常通行；Web UI 已移除，需手工编辑 maps/keepout_mask.pgm 后热加载/重启生效
-      keepout_filter:
-        plugin: "nav2_costmap_2d::KeepoutFilter"
-        enabled: true
-        filter_info_topic: "/costmap_filter_info"
+      robot_radius: 1.70   # 后备兜底：全局 footprint 外接圆 √(1.65²+0.40²)≈1.70
+      # ★ 全局规划轮廓 = 整车轮廓+5cm 余量：前 +1.65m / 后 -0.35m / 半宽 0.40m
+      #    整车（含叉）物理范围 [-0.30,+1.60]×±0.35：货叉从车尾向前 1.20m 伸在车身范围内、
+      #    车尾无伸出（2026-08-28 用户实车确认）；载货按车身长宽计（托盘规格不一，不留载货余量）
+      footprint: "[[1.65, 0.40], [1.65, -0.40], [-0.35, -0.40], [-0.35, 0.40]]"
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      # 禁区层已拆除（2026-08-27）：旧 keepout_mask 对齐已作废的旧地图，launch 侧
+      # filter_mask_server/costmap_filter_info_server 节点与 mask 文件均已删除，
+      # 本插件若留在列表里只会空等 /costmap_filter_info 刷警告（甚至阻塞激活）。
+      # 如需恢复：按新地图重画 mask + 恢复 launch 节点（git 历史可查）+ 把
+      # keepout_filter 加回 plugins（放在 inflation_layer 之前）。
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: true   # 确保能收到 map_server 的 latched 地图
@@ -283,9 +309,13 @@ global_costmap:
         plugin: "nav2_costmap_2d::ObstacleLayer"
         enabled: true
         observation_sources: scan
+        min_obstacle_height: -10.0    # ★ 层级全局下限：默认 0.0 会把 2D 激光(z=0)点全部屏蔽 → 全局地图也为空！
+        max_obstacle_height: 10.0
         scan:
           topic: /scan_filtered         # 同局部地图，使用过滤后的扫描
-          max_obstacle_height: 2.0
+          sensor_frame: base_link
+          min_obstacle_height: -10.0    # ★ 防止机体倾角导致点云高度越界被误滤
+          max_obstacle_height: 10.0
           clearing: true
           marking: true
           data_type: "LaserScan"
@@ -297,8 +327,8 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         # ★ 刻意大于局部(0.38)：全局按 0.75m 留隙规划，让 SmacPlanner 路径天生远离墙壁/货架，
-        #    为不可见的叉尖（见上方 footprint 注释）提供第二道余量；局部 0.38 负责贴障时的精细防撞
-        cost_scaling_factor: 2.5          # ★ 折中 2.5：1.5 衰减过缓，窄走廊两侧墙包的代价场延伸到中线，规划器沿途躲包导致路径蛇形；2.5 保住开阔区推离墙壁的效果，又让走廊小包的代价到不了中线
+        # ★ 提高至 8.0：加快代价衰减速度，使通道中心区域的代价降为零，从而生成完全笔直的全局规划路径，彻底根治蛇形扭动问题
+        cost_scaling_factor: 8.0
         inflation_radius: 0.75          # 0.75m：维持原值，不压缩可通行宽度
       always_send_full_costmap: false     # ★ 设为 false！只发布全局代价地图的增量更新（Diff），降低带宽占用，彻底根治 RViz 延迟卡顿！
 
@@ -307,17 +337,6 @@ map_server:
   ros__parameters:
     use_sim_time: false
     yaml_filename: ""                    # 地图路径在 launch 启动时通过参数动态传入并加载
-
-# ---------- 禁区过滤器信息服务：向 global_costmap 的 keepout_filter 通告 mask 话题与换算系数 ----------
-# 作用：定义禁区 Cost 值映射公式 (Cost = base + multiplier × mask值)
-costmap_filter_info_server:
-  ros__parameters:
-    use_sim_time: false
-    type: 0                              # 0 = 禁区过滤器 (Keepout Filter)
-    filter_info_topic: "/costmap_filter_info" # 通报给代价地图的信息话题
-    mask_topic: "/keepout_filter_mask"   # 订阅静态黑白栅格 mask 图像话题
-    base: 0.0                            # 基础 Cost 偏移量
-    multiplier: 1.0                      # Cost 缩放乘子 (黑色像素100 * 1.0 = 100 致命障碍 Cost)
 
 # ---------- 全局规划器：基于静态+实时代价地图搜索全局路径 ----------
 planner_server:
@@ -329,22 +348,25 @@ planner_server:
       plugin: "nav2_smac_planner/SmacPlannerHybrid" # ★ 工业叉车 Hybrid-A* 运动学规划器
       downsample_costmap: true         # ★ 开启代价地图降采样（加速长距离路径搜索）
       downsampling_factor: 2           # ★ 降采样因子设为 2（从 5cm 降为 10cm 规划网格，大幅提升狭窄通道规划连通性，防止误判堵塞）
-      # ★ tolerance 必须 ≤ goal_checker 的 xy_goal_tolerance(0.15)！否则目标落膨胀区时
+      # ★ tolerance 必须 ≤ goal_checker 的 xy_goal_tolerance(0.20)！否则目标落膨胀区时
       #    规划器"妥协成功"（路径只修到 0.5m 内），而到点判定永远不满足 → 近点绕圈+无限重规划
-      tolerance: 0.15                   # ★ 15cm = 0.15m：全局规划逼近精度收紧
+      tolerance: 0.20                   # ★ 20cm = 0.20m：全局规划逼近精度修改
       allow_unknown: false            # ★ 未知=障碍：建图未覆盖区域禁止规划穿越（倒车安全的另一半）
       max_iterations: 2000000          # 路径搜索最大迭代次数上限 (200万次，保证复杂长路径搜索不中断)
       max_on_approach_iterations: 10000 # 接近目标点时的逼近迭代上限
       max_planning_time: 5.0           # 最大容许规划时间放宽至 5.0s，防止超时退出
       analytic_expansion_ratio: 5.0    # 增大解析膨胀比例，加速末端 Reeds-Shepp 曲线收敛
-      # ★ 缩短至 0.5m！防止解析膨胀从远距离强行插入 Reeds-Shepp 泊车甩尾曲线
-      analytic_expansion_max_length: 0.5
-      # ★ REEDS_SHEPP（允许倒车段）：插货对位需要倒车修正能力（汽车泊车原理）
+      # ★ 1.0m（2026-08-28 起）：允许末端 RS 解析连接最长 1m，目标在正后方时可直接倒到点；
+      #    原 0.2m 是"全局禁倒"期的限制（防远距离强插泊车甩尾曲线），已随倒车开放放宽
+      analytic_expansion_max_length: 1.0
+      # ★ REEDS_SHEPP（允许倒车段）：导航全程支持倒车（只要后方已知为空，见 track_unknown_space）
       motion_model_for_search: "REEDS_SHEPP"
-      reverse_penalty: 20.0            # ★ 倒车惩罚系数：倒车成本 = 距离 × 20，中长途强迫规划前进，仅末端微调允许倒车
-      change_penalty: 15.0             # ★ 提高至 15.0：重罚末端前进/后退频繁换向，消灭末端路径的"尖尖"(V字折线)！
+      reverse_penalty: 2.0             # ★ 2026-08-28 起 20.0→2.0：解除全局禁倒，路径相当时规划器自由选择倒车
+                                       #    （窄巷道/目标在正后方不再绕大圈）；旧值 20.0=仅末端微调允许倒车
+      change_penalty: 15.0             # ★ 保持 15.0：重罚前进/后退换向，消灭末端"尖尖"(V字折线)；
+                                       #    纯倒车路径无换向不受影响，开放倒车后此值仍有效
       non_straight_penalty: 2.2        # ★ 提高至 2.2：重罚转向段，规划器偏好"先摆正车身再直穿门/直行道"，杜绝斜角进门导致叉尖扫门框的几何死局
-      cost_penalty: 2.5                # ★ 折中 2.5：3.5 时窄走廊里逐个躲避墙包代价场导致路径蛇形、方向盘左右打；2.5 保留"开阔区绕外不抄近道"的效果，又不对微小代价噪点过度反应
+      cost_penalty: 1.2                # ★ 降低至 1.2：大幅降低代价权重，使规划器优先选择直线/几何最短距离，杜绝因为代价噪点产生的细微蛇形绕行
       use_final_approach_orientation: false # ★ 关键参数：末端路径不强行甩尾匹配目标角度
       minimum_turning_radius: 1.30       # ★ 设为 1.30m！匹配地牛 AGV 1.3m 物理轴距与 75° 最大打角物理转弯半径，禁止规划器出 0.35m 无法物理执行的折线！
       lookup_table_size: 20.0          # 启发式查找表大小 (20m)
@@ -352,8 +374,8 @@ planner_server:
       debug_visualizations: false     # 关闭调试点云发布以节省 CPU
       smoother:
         max_iterations: 2000           # 路径平滑器最大迭代次数
-        w_smooth: 0.5                  # ★ 折中 0.5：0.4 时 A* 残留的微小蛇形原样下发，RPP 预瞄点左右跳导致打方向；0.5 熨平走廊微弯，又不至于像 0.6 那样在拐角硬拉直线切内侧
-        w_data: 0.15                   # 原始路径点吸引力权重
+        w_smooth: 0.6                  # ★ 调高至 0.6：加大平滑强度，强力抹平弯折抖动
+        w_data: 0.10                   # ★ 调低至 0.10：减弱对原始折线路径的依附，使铁轨般平直
         tolerance: 1e-10               # 平滑收敛判定阈值
 
 # ---------- 行为服务器：管理 恢复行为 (Recovery Behaviors) ----------
@@ -362,12 +384,12 @@ behavior_server:
     costmap_topic: local_costmap/costmap_raw # 恢复行为使用的底层代价地图
     footprint_topic: local_costmap/published_footprint # 恢复行为使用的车体轮廓
     cycle_frequency: 10.0              # 行为服务器检查频率 10Hz
-    behavior_plugins: ["wait"]
-    # ⚠️ 已移除 backup 插件：自定义行为树的恢复动作只有 Wait+清代价地图，BackUp 是死配置；
-    #    且本车后向无雷达视野，恢复性倒车本身不安全。若未来需要 BackUp，请同步在行为树
-    #    RoundRobin 中加入 <BackUp> 并重新评估后向感知。
+    behavior_plugins: ["wait", "backup"]
+    # 恢复行为定义：支持原地等待和后退避让
     wait:
       plugin: "nav2_behaviors/Wait"    # 原地挂起等待恢复插件
+    backup:
+      plugin: "nav2_behaviors/BackUp"  # 倒车避让恢复插件
     global_frame: odom                 # 行为检测与控制坐标系
     robot_base_frame: base_link        # 机器人基坐标系
     transform_tolerance: 0.5    # ★ 与其他节点统一为 0.5s；FAST-LIO 10Hz（帧间隔 100ms），0.1s 近零余量，CPU 稍忙即触发 TF 查询失败中止恢复行为
@@ -401,13 +423,29 @@ collision_monitor:
     source_timeout: 0.5                  # 扫描源超时 0.5s 无数据 → 立即停车
     base_shift_correction: true          # 用 odom 把历史点云外推到当前位姿，降低延迟误判
     stop_pub_timeout: 2.0
-    polygons: ["FrontStop", "FrontSlowdown"]
+    polygons: ["FrontStop", "BodyStop", "SideStop", "FrontSlowdown", "CircleSlowdown", "RearSlowdown", "RearStop"]
     FrontStop:
       type: "polygon"
       # 车头保险杠(1.60m)前方 5~25cm 硬停条带；起点 1.65 避开 1.60m 车头与桅杆微晃误差
       points: [1.65, -0.34, 1.65, 0.34, 1.85, 0.34, 1.85, -0.34]
       action_type: "stop"
-      max_points: 3                      # 条带内 ≥3 个回波点才判定，抗单点噪声（Humble 版参数名为 max_points）
+      max_points: 3
+      visualize: true
+    BodyStop:
+      type: "polygon"
+      # 全车身安全气囊（前1.65/后-0.38/左右±0.43）：为自转扫墙和侧向刮擦提供硬急停
+      points: [1.65, -0.43, 1.65, 0.43, -0.38, 0.43, -0.38, -0.43]
+      action_type: "stop"
+      max_points: 3
+      visualize: true
+    SideStop:
+      type: "polygon"
+      # ★ 新增侧向急停区：覆盖车身左右两侧（y=±0.43~±0.75）自转时扫掠到的人员
+      # 长度与车身一致（前 1.60m / 后 -0.30m），宽度延伸至车侧 0.75m
+      points: [1.60, 0.43, 1.60, 0.75, -0.30, 0.75, -0.30, 0.43,
+               -0.30, -0.43, -0.30, -0.75, 1.60, -0.75, 1.60, -0.43]
+      action_type: "stop"
+      max_points: 2
       visualize: true
     FrontSlowdown:
       type: "polygon"
@@ -416,6 +454,34 @@ collision_monitor:
       action_type: "slowdown"
       max_points: 3
       slowdown_ratio: 0.3
+      visualize: true
+    CircleSlowdown:
+      type: "circle"
+      # ★ 新增全向圆形减速区：半径 1.20m，覆盖自转时所有方向的提前减速
+      # 任何方向 1.20m 内有人/障碍物 → 触发 50% 减速，给急停留出时间
+      radius: 1.20
+      action_type: "slowdown"
+      max_points: 2
+      slowdown_ratio: 0.5
+      visualize: true
+    # ============ 倒车安全链（2026-08-28 新增，配合规划器全程开放倒车） ============
+    # 车尾 -0.30m 即整车最后端（货叉在车身范围内、车尾无伸出，载货按车身长宽计），
+    # 后方多边形直接贴在车尾外；屏蔽盒收紧后车尾障碍在 costmap 也可见，CM 是最后防线。
+    RearSlowdown:
+      type: "polygon"
+      # 车尾后 0.2~1.5m 减速带：障碍物进入即把倒车速度压到 25%（0.6→0.15m/s）
+      points: [-0.50, -0.43, -0.50, 0.43, -1.80, 0.43, -1.80, -0.43]
+      action_type: "slowdown"
+      max_points: 3
+      slowdown_ratio: 0.25
+      visualize: true
+    RearStop:
+      type: "polygon"
+      # 车尾后 0.20m 起的绊网急停带：0.6m/s 倒车制动需 ~0.18m < 0.20m 余量；
+      # 经 RearSlowdown 压速后 0.15m/s 制动仅 ~1cm（与 FrontStop 对称设计）
+      points: [-0.50, -0.43, -0.50, 0.43, -0.80, 0.43, -0.80, -0.43]
+      action_type: "stop"
+      max_points: 3
       visualize: true
     observation_sources: ["scan"]
     scan:

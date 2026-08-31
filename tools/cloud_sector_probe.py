@@ -1,4 +1,4 @@
-import rclpy, time
+import rclpy, time, sys
 import numpy as np
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
@@ -11,6 +11,9 @@ t0 = time.time()
 while holder["msg"] is None and time.time() - t0 < 8:
     rclpy.spin_once(node, timeout_sec=0.2)
 msg = holder["msg"]
+if msg is None:
+    print("超时无数据，请检查上游节点是否在发 /cloud_registered_body")
+    sys.exit(1)
 arr = np.asarray(point_cloud2.read_points_numpy(msg, field_names=("x", "y", "z"), skip_nans=True), dtype=np.float32).reshape(-1, 3)
 r = np.linalg.norm(arr[:, :2], axis=1)
 

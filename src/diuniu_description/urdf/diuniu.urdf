@@ -107,8 +107,23 @@
   <joint name="laser_joint" type="fixed">
     <parent link="base_link"/>
     <child link="laser_link"/>
-    <!-- 雷达真实物理安装：高度为 160cm (1.60m)，倒装 (roll=180° / 3.14159265 rad) -->
-    <origin xyz="1.215 0 1.60" rpy="3.14159265 0 0"/> 
+    <!-- 雷达真实物理安装：高度为 66cm (0.66m)，正装 (roll=0° / 0.0 rad) -->
+    <origin xyz="1.215 0 0.66" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 7. 传感器：镭神 N10 2D 激光雷达（替代 Mid360 方案时使用） -->
+  <link name="n10_laser_link">
+    <visual>
+      <geometry><cylinder radius="0.028" length="0.04"/></geometry>
+      <material name="blue"/>
+    </visual>
+  </link>
+  <joint name="n10_laser_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="n10_laser_link"/>
+    <!-- 实车安装（2026-08-31 用户确认）：原 Mid360 雷达位正前方 8cm，y 不变，
+         z=0.66 与 yaw 零度方向均已现场确认无误 -->
+    <origin xyz="1.295 0 0.66" rpy="0 0 0"/>
   </joint>
 
 </robot>

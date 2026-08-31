@@ -1,7 +1,6 @@
 import rclpy, math, time
 from nav_msgs.msg import Odometry
-from sensor_msgs.msg import LaserScan
-from rclpy.qos import QoSProfile, ReliabilityPolicy
+from common import scan_xy, subscribe_scan
 
 rclpy.init()
 node = rclpy.create_node("wobble_probe")
@@ -18,13 +17,12 @@ def odom_cb(m):
     state["pitch"] = math.degrees(math.asin(sinp))
 
 def scan_cb(m):
-    rs = [r for r in m.ranges if math.isfinite(r) and r > m.range_min]
+    rs = [r for r in (math.hypot(x, y) for x, y in scan_xy(m)) if r > m.range_min]
     if rs:
         state["min_r"] = min(rs)
 
 node.create_subscription(Odometry, "/odom", odom_cb, 10)
-qos = QoSProfile(depth=10); qos.reliability = ReliabilityPolicy.BEST_EFFORT
-node.create_subscription(LaserScan, "/scan_filtered", scan_cb, qos)
+subscribe_scan(node, "/scan_filtered", scan_cb)
 
 print(" t  | FL-roll | FL-pitch | scan最近点   (请在第5~15秒间摇动支架)")
 t0 = time.time()

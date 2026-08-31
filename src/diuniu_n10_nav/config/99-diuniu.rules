@@ -1,0 +1,16 @@
+# 地牛机器人串口固定命名（宿主机 udev 规则）
+#
+# 安装（宿主机执行，需 sudo）：
+#   sudo cp 99-diuniu.rules /etc/udev/rules.d/
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# 背景：/dev/ttyUSBx、/dev/ttyACMx 编号随插拔顺序漂移，且物理 USB 口可能换插，
+#   所以规则按设备芯片 VID:PID 区分，不按物理口/编号（2026-08-31 用户确认会换插）。
+# 两台设备同为 1a86(沁恒) 但 Product ID 不同，可干净区分。
+
+# 底盘（CH340 1a86:7523，串口协议 460800，无序列号）
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="diuniu_chassis", MODE="0666", GROUP="dialout"
+
+# N10 激光雷达（CH9102/CH343 1a86:55d4 枚举为 ttyACMx，串口协议 230400，
+# 有序列号 5B8E673157；换用同型号转串板也能匹配）
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", SYMLINK+="n10_lidar", MODE="0666", GROUP="dialout"

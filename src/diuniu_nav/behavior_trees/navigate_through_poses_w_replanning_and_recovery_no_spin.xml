@@ -1,5 +1,8 @@
 <!--
   navigate_through_poses 行为树（2.0Hz 快速重新规划）
+  ★ 核心改进：
+    1. 恢复策略加入 BackUp(20cm) 与 Wait(15s)：卡死时先倒车20cm避让，不行再原地等待，不执行高风险的 ClearCostmap
+    2. 重规划频率 2.0Hz：动态移除已通过的目标点并实时规划
 -->
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
@@ -19,14 +22,13 @@
           <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
       </PipelineSequence>
+      
+      <!-- 恢复行为 -->
       <ReactiveFallback name="RecoveryFallback">
         <GoalUpdated/>
         <RoundRobin name="RecoveryActions">
-          <Wait wait_duration="15.0"/>  <!-- ★ 原地耐心等待 15.0 秒，人走开即继续前行，不执行任何倒车动作 -->
-          <Sequence name="ClearCostmaps">
-            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
-          </Sequence>
+          <BackUp backup_dist="0.20" backup_speed="0.08"/>  <!-- ★ 卡死后倒车 20cm 避让 -->
+          <Wait wait_duration="15.0"/>                      <!-- 原地角等待 15.0 秒 -->
         </RoundRobin>
       </ReactiveFallback>
     </RecoveryNode>

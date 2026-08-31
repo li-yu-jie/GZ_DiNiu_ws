@@ -89,12 +89,19 @@ src/diuniu_description/config/camera/xw500u3_1920x1080.yaml
 # usb_cam 也会读 ~/.ros/camera_info/<camera_name>.yaml 作为后备
 ```
 
-### 现役标定结果（XW500U3，2026-08-22，1920x1080）
+### 现役标定结果（XW500U3，2026-08-26 尺度修正，1920x1080）
 
 ```
-fx=1721.32  fy=1743.82  cx=952.27  cy=608.64
+fx=2019.63  fy=2046.03  cx=952.27  cy=608.64
 畸变 (plumb_bob): k1=-0.0539  k2=0.1217  p1=0.0001  p2=-0.0032  k3=0
 ```
+
+> ⚠️ **2026-08-26 尺度修正**：原 8-22 标定的 fx/fy（1721/1744）系统性偏小 17.3%，
+> 已整体 ×1.1733（cx/cy/畸变不动）。证据：两次独立标签尺度实验比例吻合到 0.3%
+> （旧 80mm 小码拟合 k=1.1763；新 18cm 码黑边尺量 + 三点卷尺 k=1.1733），
+> 修正后 2.98m 卷尺 vs 相机 2.932m（误差 17%→1.6%）。根因疑似标定板方块边长
+> 有误——RMS 重投影误差对整体缩放不敏感，标定时无法暴露。**历史更正：旧小码
+> "有效边长 94.1mm"系把焦距误差吸入标签尺寸，真实黑边就是 80mm。**
 
 内参文件：`src/diuniu_description/config/camera/xw500u3_1920x1080.yaml`
 样本备份：`src/diuniu_description/config/camera/calibrationdata_xw500u3_20260822.tar.gz`
@@ -112,15 +119,25 @@ fx=1721.32  fy=1743.82  cx=952.27  cy=608.64
 ### 现场标签
 
 - 家族：**36h11**（6×6 数据位 + 1 格黑边框 = 8×8 格），ID = **0**
-- 有效边长：**94.1 mm**（黑色外缘）——2026-08-22 三点卷尺现场标定值，见下节
-- 打印在纸上
+- 有效边长：**18.0 cm**（黑色外缘，不含白边）——2026-08-26 尺子直接实量
+- 打印在纸上，平贴地面、面朝上，车尾相机识别
+- 历史：94.1mm 小码（2026-08-22 三点标定，已退役）
 
 ### 标签边长与距离尺度（重要）
 
 **距离精度原理**：`z = fx × 标签边长 / 像素边长`。fx 由内参标定给出，边长是
 唯一的外部尺度来源——边长错多少比例，距离就错多少比例，且**误差随距离放大**。
 
-2026-08-22 现场标定（症状："距离越大误差越大"，70cm 处偏小近 10cm）：
+边长获取优先级：**尺子直接量黑色外缘 > 任何几何反推**。
+教训（2026-08-26）：曾用"相机高 h + 地面距 d 算斜距真值"反推边长（得 17.37cm），
+被 h/d 的卷尺量测误差污染；直接尺量黑边（18.0cm）一步到位、无可累积误差。
+
+历史标定案例（旧 94.1mm 小码，2026-08-22，症状："距离越大误差越大"，70cm 处偏小近 10cm）：
+
+> **事后更正（2026-08-26）**：这次拟合得到的"94.1mm 有效边长"实为把相机内参
+> 焦距 17.3% 的偏低吸进了标签尺寸——旧码真实黑边就是 80mm。根因修复（fx/fy
+> ×1.1733）见上节。下表方法本身（多点卷尺拟合比例）仍然有效，但**拟合出比例
+> 异常时先怀疑内参焦距，再怀疑标签边长**。
 
 | 卷尺真值（0 点顶镜头口） | 修正前读出 |
 |---|---|
@@ -154,7 +171,7 @@ ros2 launch diuniu_apriltag apriltag.launch.py video_device:=/dev/video3
 ros2 launch diuniu_apriltag apriltag.launch.py video_device:=/dev/video3 rviz:=true
 
 # 临时改标签尺寸（只影响默认 size；tag0 的 TF 尺度以 config/apriltag.yaml 的 tag.sizes 为准）
-ros2 launch diuniu_apriltag apriltag.launch.py tag_size:=0.0941
+ros2 launch diuniu_apriltag apriltag.launch.py tag_size:=0.18
 ```
 
 > **改了 apriltag.yaml 必须重启 launch**：`tag.sizes` 等参数是只读的，
@@ -173,7 +190,7 @@ ros2 run tf2_ros tf2_echo camera_optical_frame tag0
 ros2 topic hz /image_raw      # 1080p MJPG 下 ~15-26 Hz 波动正常
 
 # 4. 确认标签尺寸参数已生效
-ros2 param get /apriltag tag.sizes   # 应为 [0.0941]
+ros2 param get /apriltag tag.sizes   # 应为 [0.18]
 ```
 
 ### 关键配置 [config/apriltag.yaml](config/apriltag.yaml)
@@ -181,12 +198,53 @@ ros2 param get /apriltag tag.sizes   # 应为 [0.0941]
 | 参数 | 当前值 | 说明 |
 |---|---|---|
 | `family` | `36h11` | 标签家族 |
-| `size` / `tag.sizes` | `0.0941` | 黑色方块外缘边长（米），**距离精度的唯一尺度来源** |
+| `size` / `tag.sizes` | `0.18` | 黑色方块外缘边长（米），**距离精度的唯一尺度来源** |
 | `max_hamming` | `0` | 只接受零误码检测，最严格 |
-| `detector.decimate` | `1.0` | 不降采样（保精度） |
-| `tag.ids/frames/sizes` | `[0]/[tag0]/[0.0941]` | **只有这里配置的标签才会发 TF** |
+| `detector.decimate` | `2.0` | 半分辨率初检 + refine 亚像素细化（1080p 流畅度关键） |
+| `tag.ids/frames/sizes` | `[0]/[tag0]/[0.18]` | **只有这里配置的标签才会发 TF** |
 
-## 三、常见问题
+## 三、倒车对中（tag_align）
+
+车尾相机识别地面码后，**按码中心坐标 + 码偏航角调整车身角度**，并按
+**码距 z 比例减速、到位自动停车**；叉取动作仍由人完成，手柄随时介入。
+
+```bash
+# 识别链 + 倒车对中一起起（车会动！先确认倒车方向无障无碍）
+~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_apriltag.sh rviz:=true align:=true
+
+# 运行中暂停/恢复（发零速，不断线）
+ros2 param set /tag_align enabled false
+ros2 param set /tag_align enabled true
+```
+
+**控制律（解耦两段式状态机）**：
+* **倒车阶段 (`DRIVE`)**：只进行纯横向偏差对中，屏蔽偏航角项防止控制冲突打架：
+  `w = steer_sign × k_lat·横向角`，`v = -min(reverse_speed, max(min_creep, k_v·(z − target_z)))`。
+  横向角 = `atan2(码中心x - target_x, z)`。
+  *横向减速机制*：横向偏差越大，倒车速度越慢（通过 `v_scale` 自适应缩放，且不低于 `min_creep`，防止由于电机死区走不动车）。
+* **到位阶段 (`ALIGN3`)**：倒车距离到位停车后，原地自转摆正车身朝向：
+  `w = yaw_sign × k_yaw·偏航误差`（原地自转绕后轴中点进行，不影响已对中好的左右 Y 轴位置）。
+
+全部参数在 [config/tag_align.yaml](config/tag_align.yaml)（改后重启 launch 生效）。
+
+**距离与速度控制行为**：
+- 倒车时在远处以 `reverse_speed` 速度行进，随着横向偏差变大或距离接近目标自动减速，且始终保持不低于 `min_creep` 速度直到 `target_z` 停车。
+- `|z − target_z| ≤ arrive_tol` $\to$ 停车并进入 `ALIGN3` 原地摆正朝向，之后进入 `done` 锁定。
+- `target_x` 用于物理补偿相机安装的左右偏心偏差，`target_z` 必须现场标定。
+
+**安全行为**：
+- 丢码（0.5s 无新检测） $\to$ 立即零速停车，绝不拿旧位姿盲倒。
+- 手柄活跃期底盘自动忽略本节点指令；松开手柄 0.5s 后自动恢复（注意）。
+- 不要与 Nav2 同时运行——两边都发 `/cmd_vel` 会打架。
+
+**实车调参顺序**：
+1. **横向对中符号 (`steer_sign`) 标定**：设置 `k_yaw:=0` 屏蔽偏航，摆偏车身进行倒车对中，观察车身是否朝码的中心线收拢。如果越开越偏（越调越远），则将 `steer_sign` 取反（本车已标定为 **-1.0**）。
+2. **偏航自转符号 (`yaw_sign`) 标定**：横向正常后，倒车到位停稳，在 `ALIGN3` 原地自转阶段观察车身是否向对准码的方向转动。如果旋转方向相反（越转越偏），则将 `yaw_sign` 取反（本车已标定为 **-1.0**）。
+3. **偏航角目标值标定**：左右和朝向对正后，读取 distance_watch 的偏航读数填入 `yaw_target_deg`（本车标定值为 **+90.0°**），再逐渐加大 `k_yaw`。
+4. **横向对中偏差 (`target_x`) 标定**：车子倒完对中停稳后，若物理上（货叉）偏左或偏右，读取 `distance_watch` 输出的 `左右 x` 厘米数值（如偏右 `-3.5 cm` 对应 `-0.035`），并将其填入 `target_x` 进行物理对中补偿。
+5. **距离 (`target_z`) 标定**：手工把车停到真实到位点（货叉到位），将此时 `distance_watch` 的 `z` 读数填入 `target_z`（本车标定值为 **2.30m**）。
+
+## 四、常见问题
 
 | 现象 | 原因 / 处理 |
 |---|---|
@@ -203,13 +261,15 @@ ros2 param get /apriltag tag.sizes   # 应为 [0.0941]
 | 改了 apriltag.yaml 不生效 | 参数只读，必须重启 launch；用 `ros2 param get /apriltag tag.sizes` 验证 |
 | 标定 GUI 黑窗 | 把窗口顶部 `scale` 滑块往右拖即可显示 |
 
-## 四、文件清单
+## 五、文件清单
 
 ```
 diuniu_apriltag/
-├── launch/apriltag.launch.py        # 一键启动 5 节点（相机/中继/去畸变/识别/RViz）
+├── launch/apriltag.launch.py        # 一键启动（相机/中继/去畸变/识别，可选 RViz/倒车对中）
 ├── config/apriltag.yaml             # 检测器 + 标签尺寸配置（距离尺度权威来源）
+├── config/tag_align.yaml            # 倒车对中参数（增益/车速/方向符号，调参见三节）
 ├── diuniu_apriltag/camera_info_relay.py  # camera_info 补 frame_id 中继
+├── diuniu_apriltag/tag_align_node.py     # 倒车对中节点（码中心+偏航 → /cmd_vel）
 ├── scripts/start_apriltag.sh        # 宿主机一键启动识别链路（自动定位相机）
 ├── scripts/start_distance_watch.sh  # 宿主机弹出实时距离窗口
 ├── scripts/ensure_camera.sh         # 容器内定位 XW500U3 并 mknod 补 /dev 节点

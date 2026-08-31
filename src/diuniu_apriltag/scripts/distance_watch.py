@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """AprilTag 实时距离监视器 —— 终端滚动刷新显示 tag0 的距离/偏移/姿态"""
 import math
+import os
+import sys
 import time
 
 import rclpy
@@ -9,6 +11,11 @@ from rclpy.node import Node
 from rclpy.time import Time
 import tf2_ros
 from tf2_ros import TransformException
+
+# 偏航定义与 tag_align 节点同源（rootfs 无 tf_transformations，统一收归 tf_utils）；
+# sys.path 兜底让脚本不 source install 也能直接 python3 运行
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
+from diuniu_apriltag.tf_utils import quat_yaw
 
 
 def main():
@@ -30,9 +37,7 @@ def main():
             tr = t.transform.translation
             q = t.transform.rotation
             # 四元数 → 绕竖直轴的偏航角（码正对自己时 ~0）
-            yaw = math.degrees(math.atan2(
-                2.0 * (q.w * q.z + q.x * q.y),
-                1.0 - 2.0 * (q.y * q.y + q.z * q.z)))
+            yaw = math.degrees(quat_yaw(q.w, q.x, q.y, q.z))
             line = (f"\r距离 z: {tr.z*100:6.1f} cm   左右 x: {tr.x*100:+6.1f} cm   "
                     f"上下 y: {tr.y*100:+6.1f} cm   偏航: {yaw:+6.1f}°    ")
             print(line, end='', flush=True)

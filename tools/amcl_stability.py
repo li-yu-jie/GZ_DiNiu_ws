@@ -1,5 +1,6 @@
 import rclpy, math, time
 from tf2_ros import Buffer, TransformListener
+from common import quat_yaw
 
 rclpy.init()
 node = rclpy.create_node("amcl_stability")
@@ -15,7 +16,7 @@ while time.time() - t0 < 20:
     try:
         tf = tf_buf.lookup_transform("map", "base_link", rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=1.0))
         q = tf.transform.rotation
-        yaw = math.degrees(math.atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z)))
+        yaw = math.degrees(quat_yaw(q))
         print("  %4.1fs: x=%7.3f y=%7.3f yaw=%8.2f°" % (
             time.time()-t0, tf.transform.translation.x, tf.transform.translation.y, yaw))
     except Exception as e:

@@ -44,12 +44,12 @@ ekf_filter_node:
     # 勿把 FAST-LIO 的 x,y 或 yaw 加回 EKF：坐标系与 BNO085 锚定的 odom 系不一致，
     # 会引起位姿互拉扯导致车在地图上乱跑。详见文件头注释。
 
-    # ── 传感器 3: 底盘 BNO085 / IMU (/imu2/data, frame: base_imu_link) ─────────────
+    # ── 传感器 3: 底盘 BNO085 / IMU (/imu/data, frame: base_imu_link) ─────────────
     # ★ 融合绝对航向 yaw（BNO085 融合四元数），作为整车唯一绝对航向源；
     #    与 map 系的常值偏差由 AMCL 的 map→odom 变换自动吸收
     # ⚠️ 勿开 vyaw：单片机帧内无陀螺仪原始数据，angular_velocity 恒为 0，
     #    融合它会错误地把航向角速度钉死在 0，与轮式里程计/FAST-LIO 对抗
-    imu0: /imu2/data
+    imu0: /imu/data   # 2026-08-28 起底盘只在 /imu/data 发 BNO085（/imu2/data 双发已摘除）
     imu0_config: [false, false, false,
                   false, false, true,     # yaw ← BNO085 绝对航向
                   false, false, false,

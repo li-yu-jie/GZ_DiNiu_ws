@@ -14,6 +14,7 @@ AprilTag 识别数据流启动文件
 使用方法：
   ros2 launch diuniu_apriltag apriltag.launch.py
   ros2 launch diuniu_apriltag apriltag.launch.py tag_size:=0.045   # 实测黑边边长(米)
+  ros2 launch diuniu_apriltag apriltag.launch.py align:=true      # +倒车对中(慎与Nav2同开)
 
 查看检测结果：
   ros2 topic echo /detections
@@ -37,6 +38,9 @@ def generate_launch_description():
     apriltag_config = os.path.join(
         get_package_share_directory('diuniu_apriltag'),
         'config', 'apriltag.yaml')
+    align_config = os.path.join(
+        get_package_share_directory('diuniu_apriltag'),
+        'config', 'tag_align.yaml')
 
     return LaunchDescription([
         DeclareLaunchArgument(
@@ -56,9 +60,9 @@ def generate_launch_description():
         ),
         DeclareLaunchArgument(
             'tag_size',
-            default_value='0.1737',
+            default_value='0.18',
             description='AprilTag 黑色方块外缘边长 (m)，不含白色留白边。'
-                        '2026-08-26 斜距反推有效值 17.37cm（标称 18cm 含白边）。'
+                        '2026-08-26 尺子直接实量 18.0cm。'
                         '注意：tag0 的 TF 尺度以 config/apriltag.yaml 的 tag.sizes 为准'
         ),
 
@@ -68,13 +72,26 @@ def generate_launch_description():
             description='true 时打开 RViz：相机画面 + tag 坐标轴叠加显示'
         ),
 
+        DeclareLaunchArgument(
+            'align',
+            default_value='false',
+            description='true 时启动 tag_align 倒车对中节点：两段式距离控制倒车 '
+                        '(drive 调距+横向对中 → align3 原地精调偏航 → 到位锁定)，'
+                        'target_z 必须先用 distance_watch 现场标定 '
+                        '(参数 config/tag_align.yaml)。★勿与 Nav2 同时运行'
+        ),
+
         # 1. 相机驱动：发布 /image_raw + /camera_info_raw（含标定内参）
         #    XW500U3 只有 MJPG 格式，v4l2_camera 不支持 MJPG 解码，必须用 usb_cam
         #    camera_info 先改名导出，经中继补 frame_id 后再回到 /camera_info
+        #    respawn：该相机 USB 链路不稳定，一天崩数次（Invalid v4l2 format），
+        #    崩溃 2s 后自动拉起，免得野外作业反复手动重启整条 launch
         Node(
             package='usb_cam',
             executable='usb_cam_node_exe',
             name='usb_cam',
+            respawn=True,
+            respawn_delay=2.0,
             parameters=[{
                 'video_device': LaunchConfiguration('video_device'),
                 'image_width': 1920,
@@ -136,7 +153,12 @@ def generate_launch_description():
         # 5. 静态 TF：world → camera_optical_frame（单位变换）
         #    否则相机坐标系只在识别到码时才出现在 TF 树里，
         #    RViz Camera 显示会因坐标系缺失报 Error 黑屏（时好时坏的根因）。
-        #    装车做完外参后，改由机器人 TF 树提供 base_link→camera_optical_frame。
+        #    ⚠️ 这是 RViz 可视化的权宜之计：world→camera 单位变换意味着相机系
+        #    悬浮在 world 原点，与车的真实位置无关——RViz 里相机画面/tag 轴能看，
+        #    但不能据此判断码与车的相对几何（那要读 TF 数值或 distance_watch）。
+        #    装车做完外参后，应在 URDF 加 camera_link/camera_optical_frame 并由
+        #    robot_state_publisher 提供 base_link→camera_optical_frame，届时删除本节点
+        #    （两套 TF 并存会形成 TF 孤岛/冲突，先删再加）。
         Node(
             package='tf2_ros',
             executable='static_transform_publisher',
@@ -146,7 +168,19 @@ def generate_launch_description():
             output='screen',
         ),
 
-        # 6. RViz 可视化（可选）：相机画面 + tag0 坐标轴叠加
+        # 6. 倒车对中（可选）：两段式距离控制——drive 倒车调距+纯横向对中 →
+        #    align3 原地自转精调偏航 → 到位零速锁定；丢码/内容冻结即停车；
+        #    手柄可接管；★勿与 Nav2 同时运行（争抢 /cmd_vel）
+        Node(
+            package='diuniu_apriltag',
+            executable='tag_align',
+            name='tag_align',
+            parameters=[align_config],
+            condition=IfCondition(LaunchConfiguration('align')),
+            output='screen',
+        ),
+
+        # 7. RViz 可视化（可选）：相机画面 + tag0 坐标轴叠加
         Node(
             package='rviz2',
             executable='rviz2',

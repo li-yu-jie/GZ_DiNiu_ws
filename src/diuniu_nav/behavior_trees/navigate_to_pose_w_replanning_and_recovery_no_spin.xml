@@ -1,32 +1,45 @@
 <!--
-  地牛叉车自定义导航行为树
-  ★ 重新规划频率提升至 2.0Hz，人走后 0.5s 内秒级重新规划直行最短路线。
+  地牛叉车自定义导航行为树 v2
+  ★ 核心改进：
+    1. 重规划频率 2.0Hz：RateController 周期触发 ComputePathToPose，
+       障碍物出现/消失 0.5s 内自动切换路径
+    2. 规划失败一次后清全局代价地图再试（针对地图残留虚假障碍物）；
+       跟踪失败（collision_monitor 急停 / 路径偏差过大）清局部地图后重试
+    3. 恢复策略加入 BackUp(20cm) 与 Wait(15s)：卡死后先倒车20cm避让，
+       不行再原地等待；恢复动作里不执行高风险的 ClearCostmap
+  （注：旧版头注释声称有 IsPathValid 路径有效性检测——树里从无此节点，已删）
 -->
 <root main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <RecoveryNode number_of_retries="6" name="NavigateRecovery">
       <PipelineSequence name="NavigateWithReplanning">
+
+        <!-- 每 0.5s 重规划一次（规划失败先清全局地图再试一次） -->
         <RateController hz="2.0">
           <RecoveryNode number_of_retries="1" name="ComputePathToPose">
             <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+            <!-- 规划失败一次后清全局地图再试（针对地图残留虚假障碍物） -->
             <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
         </RateController>
+
+        <!-- 跟踪路径：控制器失败（collision_monitor 急停 / 路径偏差过大）时清局部地图后重试 -->
         <RecoveryNode number_of_retries="1" name="FollowPath">
           <FollowPath path="{path}" controller_id="FollowPath"/>
           <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
         </RecoveryNode>
+
       </PipelineSequence>
+
+      <!-- 6次重试后进入恢复行为 -->
       <ReactiveFallback name="RecoveryFallback">
-        <GoalUpdated/>
+        <GoalUpdated/>  <!-- 收到新目标点立即退出等待 -->
         <RoundRobin name="RecoveryActions">
-          <Wait wait_duration="15.0"/>  <!-- ★ 原地耐心等待 15.0 秒，人走开即继续前行，不执行任何倒车动作 -->
-          <Sequence name="ClearCostmaps">
-            <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-            <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
-          </Sequence>
+          <BackUp backup_dist="0.20" backup_speed="0.08"/>  <!-- ★ 卡死后倒车 20cm 避让 -->
+          <Wait wait_duration="15.0"/>                      <!-- 原地耐心等待 15.0 秒 -->
         </RoundRobin>
       </ReactiveFallback>
+
     </RecoveryNode>
   </BehaviorTree>
 </root>

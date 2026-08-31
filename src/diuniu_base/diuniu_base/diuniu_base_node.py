@@ -34,6 +34,18 @@ class DiuNiuBaseNode(Node):
         self.declare_parameter('wheelbase', 1.30)  # 物理轴距 L = 1.30m
         self.declare_parameter('max_angular_speed', 2.5) # 最大角速度参考值
         self.declare_parameter('steer_rate_limit_dps', 240.0) # 转向角速率限制 (度/秒)，防单周期满舵跳变
+        # 轮式里程计线速度修正：k(v) = odom_vx_scale - odom_vx_slip * |v|。
+        # 下位机上报 vx 按轮径标称值换算，存在系统性比例误差。
+        # 2026-08-29 以 FAST-LIO 雷达里程计为真值标定（test/odom_lidar_calib.py，
+        # 0.2/0.4/0.6 m/s × 1m/2m 六组）：k≈0.936 与速度、方向均无关，
+        # → scale=0.936, slip=0.0（早期卷尺"高速滑移"结论系测量噪声，已推翻）。
+        # 同时修正航迹积分与 twist（EKF odom0 融合 /wheel_odom 的 vx，源头必须修）。
+        self.declare_parameter('odom_vx_scale', 1.0)
+        self.declare_parameter('odom_vx_slip', 0.0)
+        # 原地打角目标平滑：摇杆 ADC 噪声/手颤会经线性映射 1:1 传到目标角，
+        # 转向位置环每 50ms 收到抖动目标不断重新加减速，表现为"卡卡的"
+        self.declare_parameter('steer_filter_alpha', 0.25)      # EMA 低通系数 (0~1，越小越平滑但跟随越慢)
+        self.declare_parameter('steer_change_deadband_deg', 0.5) # 目标角变化死区 (度)，小于死区不更新
         # 默认关闭自带里程计发布：实车由 FAST-LIO/EKF 提供 /odom 与 TF，双重发布会冲突；
         # 仅无 SLAM 的纯底盘调试时才显式开启
         self.declare_parameter('pub_odom_tf', False)
@@ -44,6 +56,10 @@ class DiuNiuBaseNode(Node):
         self.wheelbase = self.get_parameter('wheelbase').value
         self.max_angular_speed = self.get_parameter('max_angular_speed').value
         self.steer_rate_limit_dps = self.get_parameter('steer_rate_limit_dps').value
+        self.odom_vx_scale = self.get_parameter('odom_vx_scale').value
+        self.odom_vx_slip = self.get_parameter('odom_vx_slip').value
+        self.steer_filter_alpha = self.get_parameter('steer_filter_alpha').value
+        self.steer_change_deadband = self.get_parameter('steer_change_deadband_deg').value
         self.pub_odom_topic = self.get_parameter('pub_odom_topic').value
         
         # ──────────────────────────────────────────
@@ -59,7 +75,8 @@ class DiuNiuBaseNode(Node):
         self.pub_odom = self.create_publisher(Odometry, 'odom', 10)
         self.pub_wheel_odom = self.create_publisher(Odometry, 'wheel_odom', 10)
         self.pub_imu = self.create_publisher(Imu, 'imu/data', 10)
-        self.pub_imu2 = self.create_publisher(Imu, 'imu2/data', 10)
+        # /imu2/data 双发已摘除（2026-08-28）：与 /imu/data 是同一 BNO085 消息，
+        # EKF 已改订 /imu/data，勿再恢复第二发布器（白白双倍序列化与 DDS 流量）
         self.sub_cmd_vel = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
         self.sub_cmd_vel_joy = self.create_subscription(Twist, 'cmd_vel_joy', self.cmd_vel_joy_callback, 10)
         
@@ -91,6 +108,8 @@ class DiuNiuBaseNode(Node):
         self.target_lift = 0
         self.allow_pure_rotation = False
         self.last_sent_alpha = 0.0
+        self.filtered_steer_deg = 0.0  # 原地打角 EMA 滤波状态
+        self.last_imu_log_sec = 0.0    # IMU 欧拉角日志上次打印时刻 (s)
         self.last_cmd_time = self.get_clock().now()
         # ★ 手柄接管仲裁：最近一次收到 /cmd_vel_joy 的时间。
         #    手柄活跃期间（0.5s 内）忽略 Nav2 的 /cmd_vel，防止两路指令 20~50Hz 交错争抢底盘。
@@ -224,23 +243,36 @@ class DiuNiuBaseNode(Node):
                 # 绕后轴中心自转：前轮垂直（打角 90度），前轮线速度为 |w| * L
                 alpha_deg = 90.0 if w > 0 else -90.0
                 v_front = min(abs(w) * self.wheelbase, 1.2)  # 限幅：原地自转前轮速度不超过最大线速度
+                self.filtered_steer_deg = alpha_deg  # 保持滤波状态连续，切回手柄打角时不跳变
             else:
                 # 原地只打角不走车
                 v_front = 0.0
-                alpha_deg = (w / self.max_angular_speed) * 95.0
-                if alpha_deg > 95.0: alpha_deg = 95.0
-                if alpha_deg < -95.0: alpha_deg = -95.0
+                raw_deg = (w / self.max_angular_speed) * 90.0
+                if raw_deg > 90.0: raw_deg = 90.0
+                if raw_deg < -90.0: raw_deg = -90.0
+                # ★ EMA 低通 + 变化死区：摇杆噪声/手颤经线性映射会产生 ±1~2° 的
+                #    20Hz 目标抖动，转向环反复重新加减速导致原地打角"卡卡的"。
+                #    死区与"上次实际下发值"比较，持续推杆时滤波值累积越过死区，
+                #    只会合并小幅抖动，不会冻结跟随。
+                self.filtered_steer_deg += self.steer_filter_alpha * (raw_deg - self.filtered_steer_deg)
+                alpha_deg = self.filtered_steer_deg
+                if abs(alpha_deg - self.last_sent_alpha) < self.steer_change_deadband:
+                    alpha_deg = self.last_sent_alpha
         # 2. 行驶状态下，执行正常的三轮车运动学正切计算与打角限幅
         else:
             # 三轮车运动学：alpha = atan(w * L / v)，倒车时保持正确符号
             alpha_rad = math.atan((w * self.wheelbase) / v)
             alpha_deg = math.degrees(alpha_rad)
-            
+
             # 允许最大打角达到 90.0°（匹配地牛机械物理转向能力上限）
             if alpha_deg > 90.0: alpha_deg = 90.0
             if alpha_deg < -90.0: alpha_deg = -90.0
 
             v_front = v
+            # ⚠️ 行驶分支禁止套 EMA 低通！α=0.25@20Hz 会引入 ~0.5s 跟随滞后，
+            #    叠加下方的 240°/s 速率限制后 Nav2/tag_align 闭环转向严重过冲画龙。
+            #    EMA 只是手柄静止打角防抖（见上方静止分支），这里只同步状态防跳变。
+            self.filtered_steer_deg = alpha_deg
 
         # 3. 转向角速率限制：每周期最大变化量 = 速率上限 × 定时器周期(0.05s)
         #    杜绝 Nav2 角速度阶跃/AMCL 位姿跳变导致的单周期满舵左右猛打（手柄原地打角同样生效）
@@ -335,6 +367,10 @@ class DiuNiuBaseNode(Node):
         """
         里程计航迹推算并发布 Odom 和 Imu 话题
         """
+        # 速度相关修正 k(v) = scale - slip*|v|（见参数声明注释的标定数据）
+        k = self.odom_vx_scale - self.odom_vx_slip * abs(vx)
+        vx *= max(0.0, k)
+
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds / 1e9
         self.last_time = current_time
@@ -443,24 +479,26 @@ class DiuNiuBaseNode(Node):
         imu.angular_velocity_covariance[0] = -1.0
         imu.linear_acceleration_covariance[0] = -1.0
         self.pub_imu.publish(imu)
-        self.pub_imu2.publish(imu)
 
-        # 3. 每 2 秒限频打印一次 IMU2 的四元数与解算出的欧拉角 (Roll, Pitch, Yaw)
-        sinr_cosp = 2.0 * (qw * qx + qy * qz)
-        cosr_cosp = 1.0 - 2.0 * (qx * qx + qy * qy)
-        roll = math.degrees(math.atan2(sinr_cosp, cosr_cosp))
+        # 3. 每 2 秒限频打印一次 IMU 的四元数与解算出的欧拉角 (Roll, Pitch, Yaw)
+        #    rclpy 节流只抑制输出不抑制参数构造，三角解算包在时间判断里，非打印帧零开销
+        now_sec = self.get_clock().now().nanoseconds / 1e9
+        if now_sec - self.last_imu_log_sec >= 2.0:
+            self.last_imu_log_sec = now_sec
+            sinr_cosp = 2.0 * (qw * qx + qy * qz)
+            cosr_cosp = 1.0 - 2.0 * (qx * qx + qy * qy)
+            roll = math.degrees(math.atan2(sinr_cosp, cosr_cosp))
 
-        sinp = 2.0 * (qw * qy - qz * qx)
-        pitch = math.degrees(math.asin(sinp)) if abs(sinp) < 1.0 else math.degrees(math.copysign(math.pi / 2.0, sinp))
+            sinp = 2.0 * (qw * qy - qz * qx)
+            pitch = math.degrees(math.asin(sinp)) if abs(sinp) < 1.0 else math.degrees(math.copysign(math.pi / 2.0, sinp))
 
-        siny_cosp = 2.0 * (qw * qz + qx * qy)
-        cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
-        yaw = math.degrees(math.atan2(siny_cosp, cosy_cosp))
+            siny_cosp = 2.0 * (qw * qz + qx * qy)
+            cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+            yaw = math.degrees(math.atan2(siny_cosp, cosy_cosp))
 
-        self.get_logger().info(
-            f"🧭 [IMU2 反馈] 四元数: [w={qw:.4f}, x={qx:.4f}, y={qy:.4f}, z={qz:.4f}] | 欧拉角: Roll={roll:.2f}°, Pitch={pitch:.2f}°, Yaw={yaw:.2f}°",
-            throttle_duration_sec=2.0
-        )
+            self.get_logger().info(
+                f"🧭 [IMU 反馈] 四元数: [w={qw:.4f}, x={qx:.4f}, y={qy:.4f}, z={qz:.4f}] | 欧拉角: Roll={roll:.2f}°, Pitch={pitch:.2f}°, Yaw={yaw:.2f}°"
+            )
 
     def destroy_node(self):
         self.is_running = False

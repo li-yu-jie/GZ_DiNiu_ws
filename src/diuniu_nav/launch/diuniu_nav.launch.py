@@ -2,11 +2,14 @@
 # diuniu_nav.launch.py — 地牛叉车 Nav2 自主导航一键启动文件
 #
 # 支持三种定位模式（通过 use_amcl / use_relocalization 参数切换）：
-#   模式 A（use_amcl:=false）：FAST-LIO 直连 SLAM 高精定位导航【默认实车模式】
+#   模式 A（use_amcl:=false）：FAST-LIO 直连 SLAM 高精定位导航
 #       - 前提：需先启动 livox_ros_driver2 + fast_lio（提供 odom→base_link TF 和 /odom）
+#       - ⚠️ FAST-LIO 发布的 odom→base_link 实为雷达(IMU)位姿，与诚实 base_link 相差
+#         常值 (1.215, 0, 0.66)；2026-08-28 坐标系诚实化后模式 A 与 /scan 存在该偏差，
+#         仅保留用于调试，实车导航请用模式 B（AMCL + EKF）
 #       - use_relocalization:=false（默认）：发布静态 TF map→odom（单位变换，要求建图原点即导航起点）
 #       - use_relocalization:=true：启动 AMCL，用 /scan_filtered 与 2D 栅格地图匹配，动态发布 map→odom
-#   模式 B（use_amcl:=true，默认）：AMCL 纯定位导航
+#   模式 B（use_amcl:=true）：AMCL 纯定位导航【当前默认，见 declare_use_amcl 默认值】
 #       - 使用 nav2_bringup 标准 bringup（map_server + AMCL + navigation）
 #
 # ⚠️ 重要前提（两种模式都需要）：
@@ -94,7 +97,8 @@ def generate_launch_description():
     declare_use_ekf = DeclareLaunchArgument(
         'use_ekf',
         default_value='false',
-        description='true=启动 robot_localization 多源传感器 EKF 融合节点（轮式里程计 + FAST-LIO + IMU）')
+        description='true=启动 robot_localization EKF（轮式里程计 vx/wz + BNO085 绝对航向，'
+                    '发布 odom→base_link）；false=用 FAST-LIO 原始 /odom（航向为雷达上电朝向，仅调试）')
 
     # EKF 传感器融合节点
     ekf_node = Node(
@@ -212,39 +216,13 @@ def generate_launch_description():
         ]
     )
 
-    # ============ 禁区层（两种模式都启动） ============
-    # 1. 禁区 mask 地图服务器：加载 keepout_mask.yaml，以 transient_local 发布 /keepout_filter_mask
-    #    （mask 语义：黑色=禁区，白色=可通行；Web UI 已移除，目前需手工编辑
-    #    maps/keepout_mask.pgm 后调用 /filter_mask_server/load_map 热加载或重启生效）
-    keepout_yaml = os.path.join(pkg_nav, 'maps', 'keepout_mask.yaml')
-    filter_mask_server = Node(
-        package='nav2_map_server',
-        executable='map_server',
-        name='filter_mask_server',
-        output='screen',
-        parameters=[{'use_sim_time': use_sim_time},
-                    {'yaml_filename': keepout_yaml},
-                    {'topic_name': 'keepout_filter_mask'},
-                    {'frame_id': 'map'}]
-    )
-    # 2. 禁区过滤器信息服务：向 global_costmap 的 keepout_filter 通告 mask 话题与换算系数
-    costmap_filter_info_server = Node(
-        package='nav2_map_server',
-        executable='costmap_filter_info_server',
-        name='costmap_filter_info_server',
-        output='screen',
-        parameters=[configured_params]
-    )
-    # 3. 独立生命周期管理器：自动激活上述两个节点（与模式 A/B 各自的管理器互不干扰）
-    lifecycle_manager_keepout = Node(
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_keepout',
-        output='screen',
-        parameters=[{'use_sim_time': use_sim_time},
-                    {'autostart': True},
-                    {'node_names': ['filter_mask_server', 'costmap_filter_info_server']}]
-    )
+    # ============ 禁区层已拆除（2026-08-27） ============
+    # 背景：旧 keepout_mask 对齐的是已作废的旧地图（origin 差十几米），新地图重录后
+    # mask 未重画，launch 若继续加载旧 mask 会把禁区贴到错误位置（比没有更危险）。
+    # 已从本文件移除 filter_mask_server / costmap_filter_info_server /
+    # lifecycle_manager_keepout 三个节点，nav2_params.yaml 同步摘除 keepout_filter。
+    # 如需恢复禁区：按新地图重画 keepout_mask.pgm/yaml 放回 maps/，再恢复上述节点
+    # （git 历史可查到原始配置）。
 
     # ============ 点云水平补偿节点（两种模式都启动） ============
     # 用 FAST-LIO /odom 的重力对齐姿态实时消除桅杆摆动的 roll/pitch，再交给切片。
@@ -263,51 +241,67 @@ def generate_launch_description():
 
     # ============ 3D 点云 → 2D 激光切片节点（两种模式都启动） ============
     # 将补偿后的水平点云压扁成 2D LaserScan，供代价地图避障与 AMCL 使用
-    # ⚠️ 高度区间是【雷达系 z】（点云原点在 1.6m 高的雷达处，frame_id 虽叫 base_link
-    #    但 pointcloud_to_laserscan 做恒等变换，z 不平移）：
-    #      z∈[-1.40, 0.0]  =  地面以上 [0.20, 1.60]m —— 与地图建图切片层严格一致，
-    #    可看到托盘/纸箱/脚踝；此前误设为 [0.10,1.20]（实为地面 1.7~2.8m 层，
-    #    与地图层完全不重叠 → "地图不对"+30% 扫描点无法匹配）
+    # ★ 2026-08-28 起 /cloud_leveled 是【诚实的 base_link 系】（cloud_level_node 已完成
+    #    雷达系→base_link 平移，z=0 在地面），高度区间直接按地面系书写：
+    #      z∈[0.20, 1.20]m —— 与地图建图切片层严格一致，可看到托盘/纸箱/脚踝。
+    #    ⚠️ 雷达若再移位须同步改 cloud_level 的 base_offset_* 与 URDF，否则全链错位。
     pointcloud_to_laserscan = Node(
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
         name='pointcloud_to_laserscan',
         remappings=[
-            ('cloud_in', '/cloud_leveled'),  # 水平补偿后的机体系点云（frame: base_link）
+            ('cloud_in', '/cloud_leveled'),  # 水平补偿+坐标系诚实化后的点云（frame: base_link）
             ('scan', '/scan'),
         ],
         parameters=[{
             'target_frame': 'base_link',
-            'transform_tolerance': 0.2,   # ★ 放宽至 0.2s：FAST-LIO 10Hz 发布时自然抖动 ~100ms，0.05s 容忍度过严导致频繁丢帧警告
-            'min_height': -1.30,      # ★ 雷达系 z（原点在 1.6m 高度）：地面 +0.30m（切除地面 30cm 以下光斑杂波）
-            'max_height': -0.60,      # ★ 雷达系 z（原点在 1.6m 高度）：地面 +1.00m（彻底切除地面 100cm 以上的空中障碍物与顶棚）
+            'transform_tolerance': 0.5,   # ★ 放宽至 0.5s：与 costmap 的 transform_tolerance 统一，彻底解决 TF 抖动/延迟导致的丢帧警告
+            'min_height': 0.20,       # ★ 地面系 z（z=0 在地面）：切除地面 20cm 以下光斑杂波
+            'max_height': 1.20,       # ★ 地面系 z：切除 1.2m 以上空中障碍物与顶棚
             'angle_min': -3.1415926,  # 全周 360° 扫描
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,  # 角分辨率约 0.5°
             'scan_time': 0.1,
-            'range_min': 0.50,        # ★ 提高盲区到 0.50m (匹配 Mid360 3D 物理盲区，彻底过滤雷达罩及桅杆壳体近场反射点)
+            'range_min': 0.15,        # ★ 0.15m 保留近场侧向感知（collision_monitor 用）；
+                                      #    坐标系诚实化后雷达罩/桅杆近场自反射点落在车身包络内，
+                                      #    由 laserscan_filter 屏蔽盒统一滤除，不再依赖 range_min 0.50
             'range_max': 50.0,
             'use_inf': True,
             'inf_epsilon': 1.0,
             'use_sim_time': use_sim_time,
             'concurrency_level': 0,
-            'queue_size': 2
+            'queue_size': 2           # ★ 安全链取最新帧：队列>2 会在 CPU 争抢时积压旧点云，
+                                      #    障碍进入 /scan 的延迟最坏 = 队列×100ms（10Hz）
         }],
         output='screen'
     )
 
     # ============ 雷达自遮挡过滤器（两种模式都启动） ============
+    # 屏蔽盒 2026-08-28 二次收紧（用户实车确认几何：货叉从车尾向前 1.20m 伸在车身
+    #   范围内、车尾无伸出，载货按车身长宽计）：
+    #   x_min=-0.35：车身后界 -0.30m+5cm 余量。旧值 -1.65 基于"叉尖伸出车尾"的
+    #     错误假设，会把车尾 1.3m 内的真实行人/障碍一并删掉（倒车时致命），已修正。
+    #   x_max=1.65 / y=±0.36：车头前边界 1.60m+5cm / 半宽 0.35m+1cm。
+    #   历史：x_max=2.60/y=±1.60 是【1.6m 倒装桅杆雷达】斜打前罩/门架油缸(1.87~2.58m)与
+    #   斜前 48° 地面的鬼影环经验裁切值（git 2eed3e6/c8a0a5f/5da4e7c）——代价地图订的是
+    #   /scan_filtered，宽盒会把车身两侧 1.25m 内、车头 1.65~2.6m 的行人全部滤掉
+    #   （"不避障行人"根因，2026-08-28 实车确认后收紧）。
+    # ⚠️ 若行驶中车前/斜前再发鬼影环，先查 cloud_level 链与雷达时钟失锁，勿直接放宽盒子。
     laserscan_filter = Node(
         package='diuniu_base',
         executable='laserscan_filter',
         name='laserscan_filter',
         parameters=[{
-            'x_min': -1.65,
-            'x_max': 2.60,            # ★ 2.60m：完全涵盖 AMR 地牛全车长 (车后 -1.65m 至 车头货叉尖 +2.60m)
-            'y_min': -1.60,           # ★ ±1.60m：完全涵盖斜前 48° 方向扫在 AMR 地牛侧边与防护罩上的弧形点
-            'y_max': 1.60,
+            'x_min': -0.35,           # ★ 车身后界 -0.30m+5cm（车尾无伸出，勿再退回 -1.65 幻影尾巴）
+            'x_max': 1.65,            # ★ 车头物理前边界 1.60m + 5cm 余量 = 1.65
+            'y_min': -0.36,           # ★ 2026-08-28 从 -0.40 收紧至 -0.36（车身半宽 0.35m+1cm 余量）
+                                      #    原 ±0.40 过滤盒比车体宽 5cm，紧贴车侧的人会被误删 → 不避障
+                                      #    ±0.36 仅覆盖车体物理轮廓，不会误删侧向行人
+            'y_max': 0.36,
             'laser_x_offset': 0.0,    # ★ 0.0m：pointcloud_to_laserscan target_frame 已是 base_link，无须二次叠加偏移！
-            'laser_y_offset': 0.0
+            'laser_y_offset': 0.0,
+            'arc_filter_enabled': False  # ★ 2026-08-28 关闭：圆弧过滤是 1.6m 倒装桅杆期产物，
+                                         #    会把斜前 ±38°~62°、2.2m 内的真实行人一并删掉
         }],
         output='screen'
     )
@@ -323,9 +317,6 @@ def generate_launch_description():
         ekf_node,
         bringup_with_amcl,
         bringup_without_amcl,
-        filter_mask_server,
-        costmap_filter_info_server,
-        lifecycle_manager_keepout,
         cloud_level,
         pointcloud_to_laserscan,
         laserscan_filter

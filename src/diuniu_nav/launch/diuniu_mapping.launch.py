@@ -87,8 +87,8 @@ def generate_launch_description():
     )
 
     # 6. 3D 点云 → 2D 激光切片（参数与 diuniu_nav.launch.py 保持一致，改动请两边同步）
-    #    ⚠️ 高度区间是【雷达系 z】（点云原点在 1.6m 高的雷达处）：
-    #       z∈[-1.40, 0.0] = 地面以上 [0.20, 1.60]m，与 2D 地图建图切片层一致
+    #    ★ 2026-08-28 起 /cloud_leveled 是【诚实的 base_link 系】（z=0 在地面）：
+    #       z∈[0.20, 1.20]m = 地面以上切片带，与 2D 地图建图切片层一致
     pointcloud_to_laserscan = Node(
         package='pointcloud_to_laserscan',
         executable='pointcloud_to_laserscan_node',
@@ -99,37 +99,42 @@ def generate_launch_description():
         ],
         parameters=[{
             'target_frame': 'base_link',
-            'transform_tolerance': 0.2,
-            'min_height': -1.30,      # 雷达系 z（原点在 1.6m）：地面 +0.30m
-            'max_height': -0.60,      # 雷达系 z（原点在 1.6m）：地面 +1.00m
+            'transform_tolerance': 0.5,   # ★ 放宽至 0.5s：与 costmap 的 transform_tolerance 统一，彻底解决 TF 抖动/延迟导致的丢帧警告
+            'min_height': 0.20,       # ★ 地面系 z（z=0 在地面）：切除地面 20cm 以下光斑杂波
+            'max_height': 1.20,       # ★ 地面系 z：切除 1.2m 以上空中障碍物与顶棚
             'angle_min': -3.1415926,
             'angle_max': 3.1415926,
             'angle_increment': 0.0087,
             'scan_time': 0.1,
-            'range_min': 0.50,
+            'range_min': 0.15,        # ★ 与 nav launch 同步：0.15m 近场自反射由屏蔽盒统一滤除
             'range_max': 50.0,
             'use_inf': True,
             'inf_epsilon': 1.0,
             'use_sim_time': use_sim_time,
             'concurrency_level': 0,
-            'queue_size': 2
+            'queue_size': 2           # ★ 与 nav launch 同步：取最新帧，防积压旧点云
         }],
         output='screen'
     )
 
     # 7. 雷达自遮挡过滤器：输出干净的 /scan_filtered 供 Web 端显示
-    #    参数与 diuniu_nav.launch.py 保持一致（x∈[-1.65, 1.60]，覆盖 footprint + 货叉载货区）
+    #    参数与 diuniu_nav.launch.py 保持一致（改动请两边同步）：
+    #    x_min=-0.35 车身后界+5cm（货叉在车身范围内、车尾无伸出，8-28 用户实车确认；
+    #    旧值 -1.65 系"叉尖伸出车尾"错误假设，会删掉车尾真实障碍）；x_max=1.65/y=±0.36 车身轮廓+1cm
+    #    （2026-08-28 收紧：0.66m 正装后实测无旧倒装雷达的鬼影环；
+    #      ±0.40 会把紧贴车侧的行人误删 → 不避障，故统一收紧到 ±0.36）
     laserscan_filter = Node(
         package='diuniu_base',
         executable='laserscan_filter',
         name='laserscan_filter',
         parameters=[{
-            'x_min': -1.65,
-            'x_max': 2.60,
-            'y_min': -1.60,
-            'y_max': 1.60,
+            'x_min': -0.35,
+            'x_max': 1.65,
+            'y_min': -0.36,
+            'y_max': 0.36,
             'laser_x_offset': 0.0,
-            'laser_y_offset': 0.0
+            'laser_y_offset': 0.0,
+            'arc_filter_enabled': False  # ★ 2026-08-28 关闭（桅杆期产物，会删斜前 2.2m 内真实行人）
         }],
         output='screen'
     )

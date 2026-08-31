@@ -1,9 +1,10 @@
 import rclpy, math, time
 from sensor_msgs.msg import Imu
 from nav_msgs.msg import Odometry
+from common import quat_yaw
 
 def yaw_of(q):
-    return math.degrees(math.atan2(2*(q.w*q.z+q.x*q.y), 1-2*(q.y*q.y+q.z*q.z)))
+    return math.degrees(quat_yaw(q))
 
 rclpy.init()
 node = rclpy.create_node("yaw_probe")
