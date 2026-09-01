@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>diuniu_web_ui</name>
+  <version>2.0.0</version>
+  <description>地牛叉车 Web 控制端：账号鉴权(RBAC) + 建图/导航/航点/修图(含禁区)/传感器面板，替代 RViz</description>
+  <maintainer email="y@diuniu.local">y</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>rosbridge_server</exec_depend>
+  <exec_depend>diuniu_nav</exec_depend>
+
+  <!-- Python 依赖：apt 有的走 rosdep；fastapi/uvicorn/PyJWT/websockets
+       jammy 仓库没有，需 pip3 install -r requirements.txt（websockets 缺失时
+       自动回退包内 _vendor 副本，不装也能跑） -->
+  <exec_depend>python3-bcrypt</exec_depend>
+  <exec_depend>python3-psutil</exec_depend>
+  <exec_depend>python3-pil</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

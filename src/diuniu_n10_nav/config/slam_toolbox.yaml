@@ -75,5 +75,5 @@ slam_toolbox:
     minimum_angle_penalty: 0.9
     minimum_distance_penalty: 0.5
     use_response_expansion: true
-    min_pass_through: 2
+    # min_pass_through 已删除（2026-09-02）：非 slam_toolbox 标准参数，只会触发参数告警
     occupancy_threshold: 0.1

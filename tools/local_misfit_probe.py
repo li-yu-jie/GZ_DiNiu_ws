@@ -1,11 +1,14 @@
-import rclpy, math, time, yaml, numpy as np
+import os, rclpy, math, time, yaml, numpy as np
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy
 from sensor_msgs.msg import LaserScan
 from scipy.ndimage import distance_transform_edt
 from tf2_ros import Buffer, TransformListener
 
-MAP_YAML = "/home/y/GZ_DiNiu_ws/src/diuniu_nav/maps/map.yaml"
+MAP_YAML = os.environ.get(
+    "DIUNIU_MAP_YAML",
+    os.path.join(os.environ.get("DIUNIU_WS", os.path.expanduser("~/GZ_DiNiu_ws")),
+                 "src/diuniu_nav/maps/map.yaml"))
 
 class P(Node):
     def __init__(self):

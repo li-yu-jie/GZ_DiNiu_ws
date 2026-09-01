@@ -25,8 +25,10 @@
 ## ⚙️ 环境与编译规范 (极其重要)
 
 > [!CAUTION]
-> 必须在 **Docker 容器（ros2_humble 等）内部**进行编译构建！
+> **x86 主机**：必须在 **Docker 容器（ros2_humble 等）内部**进行编译构建！
 > 绝对不要在宿主机直接跑 `colcon build`，这会把宿主机绝对路径写进 `CMakeCache` 和软链接，导致容器内路径全部悬空崩溃（报错 `can't open file build/<pkg>/setup.py`）。
+>
+> **Jetson 物理机**（无 Docker）：直接在系统里编译即可，无此限制，部署流程见下方「🛰️ Jetson 一键部署」。
 
 每次在新终端运行前，请先初始化 ROS 2 环境：
 
@@ -45,6 +47,48 @@ colcon build --symlink-install
 # ⚠️ 若彻底删除了 build/ 目录全新重编，livox_ros_driver2 必须带参数：
 colcon build --symlink-install --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=humble
 ```
+
+---
+
+## 🛰️ Jetson 一键部署（aarch64 物理机，无 Docker）
+
+除 x86 + Docker 主机外，本工作区也可部署到 **Jetson（aarch64，JetPack 6 / Ubuntu 22.04）真实物理机**，不用 Docker。
+
+**部署步骤：**
+
+```bash
+# 1. 装好 ROS2 Humble 后，克隆代码并手动补齐子模块
+#    （父仓库缺 .gitmodules，需手动 clone FAST_LIO / livox_ros_driver2 / Lslidar_ROS2_driver）
+
+# 2. 一键安装系统依赖 + ROS 依赖包 + udev 规则
+./tools/jetson_setup.sh
+
+# 3. 按脚本结尾提示完成手动步骤：
+#    - 源码编译 aarch64 版 Livox-SDK2 安装到 /usr/local/lib（x86 的 .so 不能复制）
+#    - Mid360 网卡配静态 IP 172.21.22.21/24（用 N10 雷达栈可跳过）
+#    - 重新登录使 dialout 组生效
+
+# 4. 清理旧产物并重新编译（x86 的 build/install 在 ARM 上无法运行）
+cd ~/GZ_DiNiu_ws
+rm -rf build install log
+source /opt/ros/humble/setup.bash
+colcon build --symlink-install --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=humble
+
+# 5. 建议拉满性能
+sudo nvpmodel -m 0 && sudo jetson_clocks
+```
+
+**与 x86 Docker 环境的差异：**
+
+| 事项 | x86 主机 | Jetson 物理机 |
+| :--- | :--- | :--- |
+| 编译位置 | 必须在容器内 | 系统里直接编译 |
+| udev 规则 | 宿主机装 + `tools/sync_dev.sh` 同步进容器 | 直接装 `/etc/udev/rules.d/`（`sync_dev.sh` 不需要） |
+| Livox SDK | x86 预编译 .so | 必须源码编译 aarch64 版 |
+| 启动脚本 | `start_apriltag.sh` 自动走容器分支 | 同一脚本自动走物理机分支（三模式自适应） |
+
+> [!NOTE]
+> `src/diuniu_apriltag/scripts/start_apriltag.sh` 会根据环境自动选择启动方式（容器内 / 宿主机+容器 / 物理机），工作区路径从脚本位置自动推导，两台机器用同一份代码即可。
 
 ---
 
@@ -74,3 +118,74 @@ colcon build --symlink-install --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=humb
    - **手柄按下使能键期间**，完全无视 Nav2 指令（日志显示 `🎮 [仲裁]`）。
    - **手柄松开 $0.5\text{s}$ 后**，自动平滑交还控制权给 Nav2。
 4. **静默让权**：向 `/cmd_vel_joy` 发消息的控制端，在停止遥控后必须**彻底停止发送话题**（连全零帧也不许发），否则会导致 Nav2 永久被屏蔽。
+
+---
+
+## 🚀 常用启动命令速查
+
+> 所有命令均假定已先执行环境初始化（见上文「⚙️ 环境与编译规范」）：
+>
+> ```bash
+> cd ~/GZ_DiNiu_ws && source /opt/ros/humble/setup.bash && source install/setup.bash
+> ```
+
+### 导航（二选一，严禁同时启动）
+
+```bash
+# ⭐ N10 2D 雷达栈（主力推荐）：雷达驱动 + EKF + AMCL + Nav2 一键全起
+ros2 launch diuniu_n10_nav n10_nav_all.launch.py
+# 雷达串口识别异常时显式指定：
+ros2 launch diuniu_n10_nav n10_nav_all.launch.py serial_port:=/dev/ttyACM0
+
+# Mid360 3D 雷达栈：Mid360 驱动 + FAST-LIO + Nav2 一键全起
+ros2 launch diuniu_nav diuniu_nav_all.launch.py
+```
+
+```bash
+# RViz 可视化（N10 / Mid360 栈共用同一份配置）
+rviz2 -d ~/GZ_DiNiu_ws/src/diuniu_nav/rviz/diuniu_nav.rviz
+```
+
+> ℹ️ N10 栈的 AMCL 已配置**停车位自动初始位姿**（`set_initial_pose: true`，坐标 = waypoints.json 的「初始位置」），从停车位开机无需任何操作即可直接导航。若从别处开机，用 RViz 的 `2D Pose Estimate` 纠正一次即可；不给初始位姿时 Nav2 会一直等待（目标点无响应），补上后随时恢复，不存在超时睡死。Mid360 栈由 FAST-LIO 自动定位，同样无需手动标位姿。
+
+### 建图
+
+```bash
+# N10 栈：slam_toolbox 在线建图（自带 RViz）
+ros2 launch diuniu_n10_nav n10_mapping.launch.py
+
+# Mid360 栈：FAST-LIO 建图，Ctrl+C 退出时自动落盘 PCD（再转 2D 地图）
+ros2 launch diuniu_nav diuniu_mapping.launch.py
+```
+
+### 手柄遥控
+
+```bash
+# 常规：手柄 -> /cmd_vel_joy 话题（经底盘仲裁，与 Nav2 共存，推荐）
+ros2 launch betop_teleop diuniu_teleop_cmd_vel.launch.py
+
+# 串口直控底盘（绕过仲裁，调试底盘专用）
+ros2 launch betop_teleop diuniu_teleop_serial.launch.py port:=/dev/ttyUSB0
+```
+
+### AprilTag 视觉对接
+
+```bash
+# 一键启动识别链（自动定位 XW500U3 相机，三环境自适应：容器/宿主机+容器/Jetson）
+~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_apriltag.sh
+~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_apriltag.sh rviz:=true   # 带画面
+
+# 实时距离监视窗口
+~/GZ_DiNiu_ws/src/diuniu_apriltag/scripts/start_distance_watch.sh
+
+# 手动触发一次完整对中（推荐，完成后自动暂停）
+ros2 run diuniu_apriltag manual_align
+```
+
+### 常用排查
+
+```bash
+ros2 topic hz /scan                 # 雷达数据流是否正常（N10 应 ~10Hz）
+ros2 topic echo /joy                # 手柄输入是否在线（轴应满量程 ±1.0）
+ros2 run tf2_ros tf2_echo map base_link   # 定位 TF 链是否打通
+```

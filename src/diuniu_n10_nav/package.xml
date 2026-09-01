@@ -4,7 +4,8 @@
   <name>diuniu_n10_nav</name>
   <version>0.1.0</version>
   <description>地牛叉车 N10 2D 激光雷达建图与导航栈（镭神 LSLiDAR N10，串口），
-    独立于 diuniu_nav 的 Mid360 + FAST-LIO 方案，可切换使用。</description>
+    替代 diuniu_nav 的 Mid360 + FAST-LIO 方案，运行时二选一；
+    行为树 XML 与 diuniu_navigation_launch.py 复用 diuniu_nav（已声明依赖）。</description>
   <maintainer email="y@todo.todo">y</maintainer>
   <license>TODO: License declaration</license>
 

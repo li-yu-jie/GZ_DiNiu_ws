@@ -8,7 +8,9 @@
 # 容器内运行（ros2y 进来后）→ 直接在当前终端显示，Ctrl+C 退出。
 
 set -eu
-WS=/home/y/GZ_DiNiu_ws
+# 从脚本位置反推工作区根目录（scripts/ -> diuniu_apriltag/ -> src/ -> WS），
+# 与 start_apriltag.sh 同一套自适应逻辑，x86 与 Jetson 通用
+WS=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 
 if [ -f /.dockerenv ]; then
     # —— 容器内模式：当前终端直接跑 ——
@@ -16,10 +18,20 @@ if [ -f /.dockerenv ]; then
     source /opt/ros/humble/setup.bash
     set -u
     exec python3 "$WS/src/diuniu_apriltag/scripts/distance_watch.py"
+elif ! command -v docker >/dev/null 2>&1 || \
+     ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx ros2_humble; then
+    # —— 物理机无 Docker（Jetson 等）：当前终端直接跑 ——
+    set +u
+    source /opt/ros/humble/setup.bash
+    set -u
+    exec python3 "$WS/src/diuniu_apriltag/scripts/distance_watch.py"
 else
     # —— 宿主机模式：弹桌面窗口 ——
-    DISPLAY=:1 gnome-terminal --title "AprilTag 实时距离" --geometry 75x6+100+100 -- \
-        bash -c "docker exec -it ros2_humble su - y -c \
+    # 容器用户名/显示号可用环境变量覆盖（默认 y / 宿主当前 DISPLAY 或 :1）
+    CONTAINER_USER=${ROS2_CONTAINER_USER:-y}
+    DISP=${DISPLAY:-:1}
+    DISPLAY=$DISP gnome-terminal --title "AprilTag 实时距离" --geometry 75x6+100+100 -- \
+        bash -c "docker exec -it ros2_humble su - $CONTAINER_USER -c \
             'source /opt/ros/humble/setup.bash && python3 $WS/src/diuniu_apriltag/scripts/distance_watch.py'; \
             echo; echo '按回车关闭'; read"
 fi

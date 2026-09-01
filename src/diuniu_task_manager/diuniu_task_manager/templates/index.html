@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>地牛 (DiuNiu) FMS 任务调度终端</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --secondary: #10B981;
+            --background: #0F172A;
+            --surface: rgba(30, 41, 59, 0.7);
+            --text-main: #F8FAFC;
+            --text-muted: #94A3B8;
+            --accent: #F43F5E;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: var(--background);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.2) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.2) 0px, transparent 50%);
+            background-attachment: fixed;
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            width: 100%;
+            padding: 2rem 1rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin: 0;
+            background: linear-gradient(to right, #60A5FA, #34D399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 4px 20px rgba(96, 165, 250, 0.3);
+        }
+
+        .subtitle {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            padding: 1.5rem;
+            box-sizing: border-box;
+        }
+
+        .glass-card {
+            background: var(--surface);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        select {
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.125rem;
+            font-family: 'Inter', sans-serif;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px;
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.3s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 1rem center;
+            background-size: 1em;
+        }
+
+        select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3);
+        }
+
+        select option {
+            background: var(--background);
+            color: var(--text-main);
+        }
+
+        .btn-dispatch {
+            width: 100%;
+            padding: 1.25rem;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: white;
+            background: linear-gradient(135deg, var(--primary) 0%, #818CF8 100%);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 20px rgba(79, 70, 229, 0.3);
+            margin-top: 1rem;
+        }
+
+        .btn-dispatch:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 25px rgba(79, 70, 229, 0.4);
+        }
+
+        .btn-dispatch:active {
+            transform: translateY(1px);
+        }
+
+        .status-box {
+            margin-top: 2rem;
+            padding: 1rem;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .status-box.show {
+            opacity: 1;
+        }
+
+        .status-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34D399;
+        }
+
+        .status-error {
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            color: #FB7185;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+            vertical-align: middle;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>DiuNiu FMS</h1>
+        <div class="subtitle">自动物流任务调度终端</div>
+    </header>
+
+    <div class="container">
+        <div class="glass-card">
+            <div class="form-group">
+                <label for="pickup">📍 取货站点 (PICKUP)</label>
+                <select id="pickup">
+                    <option value="" disabled selected>请选择取货点...</option>
+                    <option value="A">A 站点 (原料区 1)</option>
+                    <option value="B">B 站点 (原料区 2)</option>
+                    <option value="C">C 站点 (成品区 1)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="dropoff">🎯 卸货站点 (DROPOFF)</label>
+                <select id="dropoff">
+                    <option value="" disabled selected>请选择卸货点...</option>
+                    <option value="A">A 站点 (原料区 1)</option>
+                    <option value="B">B 站点 (原料区 2)</option>
+                    <option value="C">C 站点 (成品区 1)</option>
+                </select>
+            </div>
+
+            <button class="btn-dispatch" id="btn-dispatch" onclick="dispatchTask()">
+                发送任务指令 <div class="spinner" id="spinner"></div>
+            </button>
+
+            <div id="status" class="status-box"></div>
+        </div>
+    </div>
+
+    <script>
+        async function dispatchTask() {
+            const pickup = document.getElementById('pickup').value;
+            const dropoff = document.getElementById('dropoff').value;
+            const statusBox = document.getElementById('status');
+            const btn = document.getElementById('btn-dispatch');
+            const spinner = document.getElementById('spinner');
+
+            if (!pickup || !dropoff) {
+                showStatus('请同时选择取货点和卸货点！', 'error');
+                return;
+            }
+            if (pickup === dropoff) {
+                showStatus('取货点和卸货点不能相同！', 'error');
+                return;
+            }
+
+            // UI Loading state
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+            statusBox.className = 'status-box'; // reset
+
+            try {
+                const response = await fetch('/api/dispatch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pickup, dropoff })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(result.message, 'success');
+                } else {
+                    showStatus(result.message || '下发失败', 'error');
+                }
+            } catch (error) {
+                showStatus('网络请求失败，请检查服务器连接', 'error');
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusBox = document.getElementById('status');
+            statusBox.textContent = message;
+            statusBox.className = `status-box show status-${type}`;
+            setTimeout(() => {
+                statusBox.className = `status-box status-${type}`;
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

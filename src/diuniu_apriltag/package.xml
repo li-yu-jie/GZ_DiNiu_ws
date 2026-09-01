@@ -16,6 +16,9 @@
   <exec_depend>usb_cam</exec_depend>
   <exec_depend>image_proc</exec_depend>
   <exec_depend>apriltag_ros</exec_depend>
+  <!-- apriltag.launch.py 引用：机器人模型（camera TF）与可视化 -->
+  <exec_depend>diuniu_description</exec_depend>
+  <exec_depend>rviz2</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

@@ -12,10 +12,16 @@ ros2 launch diuniu_n10_nav n10_nav_all.launch.py
 ```
 
 启动后，打开 RViz：
+
 ```bash
 rviz2 -d /home/y/GZ_DiNiu_ws/src/diuniu_nav/rviz/diuniu_nav.rviz
 ```
-⚠️ **极其重要的防呆操作**：由于系统存在等待超时机制，在 RViz 画面出来后，请**务必在 1 分钟内**使用顶部的 `2D Pose Estimate` 工具为小车标定一次初始位置。否则导航控制节点会因等待超时而陷入休眠状态（导致发送目标点无响应）。
+
+**初始位姿（已自动化）**：AMCL 已配置 `set_initial_pose: true`，初值 = 固定停车位（即 `diuniu_nav/maps/waypoints.json` 的「初始位置」，两栈地图同原点，坐标通用）。从停车位开机时系统自动定位，**无需手动标位姿**，可直接下发目标点。
+
+若从别处开机，AMCL 会先锁定停车位坐标（位姿错误），此时照旧在 RViz 用 `2D Pose Estimate` 纠正一次即可（AMCL 接受 `/initialpose` 覆盖）；长期更换停车位请同步更新 `config/nav2_params.yaml` 里的 `initial_pose`。
+
+> **机制说明**：不给初始位姿时，AMCL 不发布 `map→odom`，Humble 下 global_costmap 激活会卡在等 TF，后续 planner / bt_navigator 一直激活不了（表现为发目标点无响应）。这是**无限期等待而非超时睡死**——任何时候补上初始位姿，链路都会继续激活恢复。
 
 ---
 
@@ -58,7 +64,9 @@ rviz2 -d /home/y/GZ_DiNiu_ws/src/diuniu_nav/rviz/diuniu_nav.rviz
 
 **Q: 启动后报错找不到雷达端口？**
 A: Docker 容器启动时可能没有将后插的雷达 USB 口映射进来。尝试拔插雷达，或者在启动参数中显式指定宿主机识别到的串口：
+
 ```bash
 ros2 launch diuniu_n10_nav n10_nav_all.launch.py serial_port:=/dev/ttyACM0
 ```
+
 （推荐修改宿主机 udev 规则，将雷达永久绑定为 `/dev/n10_lidar` 即可免加参数）。

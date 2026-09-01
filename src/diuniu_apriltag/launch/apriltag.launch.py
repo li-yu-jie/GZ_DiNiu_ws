@@ -45,8 +45,8 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument(
             'video_device',
-            default_value='/dev/video3',
-            description='XW500U3 USB 相机的 V4L2 设备节点（重插会漂移，启动前确认）'
+            default_value='/dev/video0',
+            description='XW500U3 USB 相机的 V4L2 设备节点（重插会漂移，通常为 /dev/video0）'
         ),
         DeclareLaunchArgument(
             'camera_info_url',

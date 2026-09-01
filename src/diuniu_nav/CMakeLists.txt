@@ -28,7 +28,6 @@ install(DIRECTORY
 )
 
 install(PROGRAMS
-  diuniu_nav/agv_cargo_switcher.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

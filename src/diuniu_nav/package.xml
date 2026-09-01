@@ -16,6 +16,10 @@
   <exec_depend>pointcloud_to_laserscan</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <!-- launch 引用：EKF 融合 / 底盘驱动（laserscan_filter 也在此包）/ 整车 URDF -->
+  <exec_depend>robot_localization</exec_depend>
+  <exec_depend>diuniu_base</exec_depend>
+  <exec_depend>diuniu_description</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

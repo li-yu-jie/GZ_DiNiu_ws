@@ -1,0 +1,10 @@
+# diuniu_web_ui 后端 Python 依赖（apt/rosdep 装不全的部分，用 pip 补）
+# 安装：pip3 install -r requirements.txt
+fastapi
+uvicorn
+PyJWT
+websockets>=12    # rosbridge 鉴权代理的上游客户端；缺失时自动回退包内 _vendor 副本
+bcrypt
+psutil
+Pillow
+PyYAML

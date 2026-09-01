@@ -27,6 +27,7 @@ setup(
         'console_scripts': [
             'camera_info_relay = diuniu_apriltag.camera_info_relay:main',
             'tag_align = diuniu_apriltag.tag_align_node:main',
+            'manual_align = diuniu_apriltag.manual_align:main',
         ],
     },
 )

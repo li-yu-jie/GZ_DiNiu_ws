@@ -1,0 +1,65 @@
+/* ===== 地牛叉车 Web UI 全局主题：简约专业深色 =====
+ * 基于 Element Plus 暗色模式，统一覆盖表面色/边框/文字色，
+ * 风格目标：扁平、克制、统一（参考 Grafana 类监控后台）。
+ */
+
+:root {
+  /* 项目自有色板（组件 scoped 样式里统一引用这组变量） */
+  --dn-bg: #0c1016;            /* 页面底色 */
+  --dn-surface: #161c25;       /* 卡片/区块表面 */
+  --dn-surface-2: #1d242f;     /* 次级表面（瓦片/工具条/输入框） */
+  --dn-border: rgba(255, 255, 255, 0.08);
+  --dn-border-strong: rgba(255, 255, 255, 0.14);
+  --dn-text: #d5dde7;          /* 主文字 */
+  --dn-text-dim: #8894a4;      /* 次要文字 */
+  --dn-text-faint: #5d6878;    /* 占位/禁用 */
+  --dn-accent: #409eff;        /* 强调色（与 Element primary 一致） */
+  --dn-success: #4caf7d;
+  --dn-danger: #e06c60;
+  --dn-radius: 8px;
+}
+
+/* Element Plus 暗色变量微调：把默认的纯灰调成统一的深蓝灰 */
+html.dark {
+  --el-bg-color-page: var(--dn-bg);
+  --el-bg-color: var(--dn-surface);
+  --el-bg-color-overlay: #1e2631;      /* 弹窗/下拉浮层 */
+  --el-text-color-primary: var(--dn-text);
+  --el-text-color-regular: #b8c2ce;
+  --el-text-color-secondary: var(--dn-text-dim);
+  --el-text-color-placeholder: var(--dn-text-faint);
+  --el-text-color-disabled: #4a5462;
+  --el-border-color: #2c3542;
+  --el-border-color-light: #28303c;
+  --el-border-color-lighter: #242c37;
+  --el-border-color-extra-light: #20272f;
+  --el-fill-color: #242c38;
+  --el-fill-color-light: #1f2732;
+  --el-fill-color-lighter: #1b222c;
+  --el-fill-color-extra-light: #181f28;
+  --el-fill-color-blank: var(--dn-surface);
+  --el-mask-color: rgba(5, 8, 12, 0.72);
+  --el-box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --el-box-shadow-light: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --el-box-shadow-lighter: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --el-box-shadow-dark: 0 12px 32px rgba(0, 0, 0, 0.55);
+  --el-border-radius-base: 6px;
+  --el-card-border-radius: var(--dn-radius);
+  --el-disabled-bg-color: #1a212b;
+  --el-disabled-text-color: #4a5462;
+  --el-disabled-border-color: #242c37;
+}
+
+body {
+  background: var(--dn-bg);
+  color: var(--dn-text);
+}
+
+/* 滚动条：细、暗、不抢视线 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #2c3542; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a4554; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* 数字统一等宽，监控数值不跳动 */
+.tabular { font-variant-numeric: tabular-nums; }

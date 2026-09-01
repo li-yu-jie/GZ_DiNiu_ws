@@ -246,7 +246,7 @@ local_costmap:
       width: 5
       height: 5
       resolution: 0.05                  # 5cm 栅格分辨率
-      robot_radius: 1.64  # 后备防撞圆半径（footprint 解析失败时的兜底）：局部 footprint 外接圆 √(1.60²+0.35²)≈1.64
+      # robot_radius 已删除（2026-09-02）：Nav2 中 footprint 优先，radius 并非解析失败兜底，留着只会误导
       # ★ 局部碰撞轮廓 = 整车物理轮廓（含叉）：车头 +1.60m / 车尾 -0.30m / 半宽 0.35m
       #    货叉从车尾向前 1.20m 伸在车身范围内、车尾无伸出（2026-08-28 用户实车确认），
       #    整车轮廓即车身轮廓；RPP 倒车碰撞检查依赖本轮廓，勿再加"叉尖幻影尾巴"
@@ -291,7 +291,7 @@ global_costmap:
       transform_tolerance: 0.5
       # ★ 未知=障碍：建图时没扫到的区域一律视为不可通行（配合 planner allow_unknown: false）
       track_unknown_space: true
-      robot_radius: 1.70   # 后备兜底：全局 footprint 外接圆 √(1.65²+0.40²)≈1.70
+      # robot_radius 已删除（2026-09-02）：同上，footprint 优先生效
       # ★ 全局规划轮廓 = 整车轮廓+5cm 余量：前 +1.65m / 后 -0.35m / 半宽 0.40m
       #    整车（含叉）物理范围 [-0.30,+1.60]×±0.35：货叉从车尾向前 1.20m 伸在车身范围内、
       #    车尾无伸出（2026-08-28 用户实车确认）；载货按车身长宽计（托盘规格不一，不留载货余量）

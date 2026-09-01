@@ -82,6 +82,7 @@ from rclpy.node import Node
 from rclpy.time import Time
 from rcl_interfaces.msg import SetParametersResult
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Bool
 import tf2_ros
 from tf2_ros import TransformException
 
@@ -106,18 +107,20 @@ class TagAlignNode(Node):
         self.declare_parameter('max_angular', 0.4)      # 角速度限幅 (rad/s)
         self.declare_parameter('k_lat', 1.2)            # 横向角增益 (rad/s per rad)
         self.declare_parameter('k_yaw', 0.15)           # 偏航增益 (rad/s per rad)
-        self.declare_parameter('yaw_target_deg', 100.0)  # 目标偏航（度），摆正实读数；2026-08-30 实车复测基线+100°
+        self.declare_parameter('yaw_target_deg', 90.0)   # 目标偏航（度），摆正实读数；基线随相机座
+        # 松动漂移（8-26 +90°→8-30 +100°→8-31 +90°），默认值与 yaml 同步，动相机后重标写回 yaml
         self.declare_parameter('steer_sign', -1.0)       # 横向对中方向符号（2026-08-30 实车复测 -1），打反则取反
         self.declare_parameter('yaw_sign', -1.0)         # 偏航自转方向符号（2026-08-30 实车复测 -1；当日曾误改 +1 已推翻），打反则取反
         self.declare_parameter('lost_timeout', 1.5)     # 无新检测判丢码 (s)。检测链 CPU 争抢时
         # 帧率可掉到 1~2fps，0.5s 会误杀活码；1.5s×0.16m/s=24cm 盲倒上限可接受
         self.declare_parameter('control_rate', 20.0)    # cmd_vel 发布频率 (Hz)，底盘看门狗 0.2s 需 >5Hz
         # （注意：control_rate 只在启动时读一次，热改需重启节点）
-        self.declare_parameter('enabled', True)
+        self.declare_parameter('enabled', False)         # 默认暂停（与 yaml 同步），由 FMS/手动脚本唤醒；
+        # 默认 True 时裸 ros2 run 不带 yaml 会立即动车
         # —— 距离控制（到位停车）——
         self.declare_parameter('distance_enable', True)  # 总开关；false=恒速倒不管距离
         self.declare_parameter('target_x', 0.0)          # 目标 x 实读数 (m)，用于补偿相机左右安装偏差
-        self.declare_parameter('target_z', 2.40)         # 到位时 z 实读数 (m)，★必须现场标定
+        self.declare_parameter('target_z', 2.30)         # 到位时 z 实读数 (m)，★必须现场标定（默认与 yaml 同步）
         self.declare_parameter('k_v', 0.4)               # 接近段速度斜率 v=k_v·误差 (1/s)
         self.declare_parameter('min_creep', 0.12)        # 末段爬行 (m/s)，克服电机启动死区；不得低于底盘 0.05 阈值
         self.declare_parameter('creep_floor', 0.06)      # 横向减速后的速度下限 (m/s)。v_scale 横向减速
@@ -133,7 +136,7 @@ class TagAlignNode(Node):
         self.declare_parameter('min_pivot_w', 0.10)      # 原地自转最小角速度 (rad/s)，
         # 底盘纯旋转模式要求 |v|<0.05 且 |w|>=0.05 才触发（前轮±90°绕后轴自转），
         # 低于阈值只打角不走车会假死，故 ALIGN3 段把小 w 抬到该值
-        self.declare_parameter('stale_w_window', 0.3)    # ALIGN3 只用该时长内的新检测发自转 w (s)，
+        self.declare_parameter('stale_w_window', 0.8)    # ALIGN3 只用该时长内的新检测发自转 w (s)，
         # 其余周期发零速等新帧——偏航随自转快速变化，拿旧读数继续转=盲转
         self.declare_parameter('freeze_timeout', 3.0)    # 内容冻结判活 (s)：stamp 在推进但位姿读数
         # 不变（DRIVE/ALIGN3 中车本该在动）→ 相机冻结/USB 卡死或车轮受阻打滑 → 停车
@@ -203,6 +206,7 @@ class TagAlignNode(Node):
         self.tf_buf = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buf, self)
         self.pub = self.create_publisher(Twist, gp('cmd_vel_topic').value, 10)
+        self.done_pub = self.create_publisher(Bool, 'tag_align_done', 10)
         self.timer = self.create_timer(
             1.0 / gp('control_rate').value, self.control_loop)
 
@@ -271,6 +275,11 @@ class TagAlignNode(Node):
     def stop(self, reason):
         """发零速并节流打印原因。"""
         self.pub.publish(Twist())
+        # done 话题非 latched：done 锁定中丢码/异常走 stop() 时若不发 False，
+        # 下游（FMS/manual_align）会拿残留的 True 继续流程
+        msg = Bool()
+        msg.data = False
+        self.done_pub.publish(msg)
         self._reset_filter()
         self.get_logger().warn(f'🛑 停车: {reason}', throttle_duration_sec=1.0)
 
@@ -278,6 +287,12 @@ class TagAlignNode(Node):
         if not self.get_parameter('enabled').value:
             self.stop('enabled=false（已暂停，param set 可恢复）')
             return
+            
+        if self.state != 'done':
+            msg = Bool()
+            msg.data = False
+            self.done_pub.publish(msg)
+
 
         # 每周期热读调参参数（本地读，开销可忽略）：
         # 现场标定/调参用 ros2 param set 立即生效，不用改 yaml 重编译重启。
@@ -443,6 +458,9 @@ class TagAlignNode(Node):
                     f'目标 {self.target_z:.2f}m），转 OVERSHOOT 报警')
             else:
                 self.pub.publish(cmd)   # 零速锁定
+                msg = Bool()
+                msg.data = True
+                self.done_pub.publish(msg)
                 self.get_logger().info(
                     f'[DONE 锁定] {see} | 偏航误差 {math.degrees(yaw_err):+5.1f}°',
                     throttle_duration_sec=2.0)
@@ -597,6 +615,9 @@ class TagAlignNode(Node):
                     self.state = 'done'
                     self.settling_start_time = None
                     self.pub.publish(cmd)
+                    msg = Bool()
+                    msg.data = True
+                    self.done_pub.publish(msg)
                     self.get_logger().warn(
                         f'🎉 已到位！对中圆满完成！已稳定保持 {elapsed:.1f}s，锁定！'
                         f'z={tr.z:.2f}m（目标 {self.target_z:.2f}m）x={tr.x*100:+.1f}cm '

@@ -1,7 +1,9 @@
 #!/bin/bash
 # EKF 融合 BNO085 航向验证脚本（容器内运行）
+# 工作区从脚本位置反推（tools/ -> WS），可用 DIUNIU_WS 覆盖
+WS=${DIUNIU_WS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 source /opt/ros/humble/setup.bash
-source /home/y/GZ_DiNiu_ws/install/setup.bash
+source "$WS/install/setup.bash"
 
 # 1. 底盘节点
 ros2 launch diuniu_base diuniu_base.launch.py > /tmp/ekf_test_base.log 2>&1 &
@@ -9,13 +11,13 @@ BASE_PID=$!
 
 # 2. 静态 TF
 ros2 run robot_state_publisher robot_state_publisher --ros-args \
-  -p robot_description:="$(cat /home/y/GZ_DiNiu_ws/src/diuniu_description/urdf/diuniu.urdf)" \
+  -p robot_description:="$(cat "$WS/src/diuniu_description/urdf/diuniu.urdf")" \
   > /tmp/ekf_test_rsp.log 2>&1 &
 RSP_PID=$!
 
 # 3. EKF
 ros2 run robot_localization ekf_node --ros-args \
-  --params-file /home/y/GZ_DiNiu_ws/src/diuniu_nav/config/ekf.yaml \
+  --params-file "$WS/src/diuniu_nav/config/ekf.yaml" \
   > /tmp/ekf_test_ekf.log 2>&1 &
 EKF_PID=$!
 

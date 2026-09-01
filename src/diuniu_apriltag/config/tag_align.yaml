@@ -72,7 +72,7 @@ tag_align:
                               # 检测链 CPU 争抢时帧率可掉到 1~2fps，0.5s 会误杀活码；
                               # 1.5s×0.16m/s = 24cm 盲倒上限可接受
     control_rate: 20.0        # cmd_vel 发布频率 (Hz)，底盘看门狗 0.2s 需 >5Hz
-    enabled: true             # false = 持续零速暂停；ros2 param set 可热切换
+    enabled: false            # false = 启动时默认暂停，由 FMS 调度节点或手动脚本唤醒
 
     # —— 拉前重试修正参数 ——
     max_forward_retries: 5    # 到位但横向未对齐时，向前滑行重新纠偏的最大尝试次数

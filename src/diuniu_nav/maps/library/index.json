@@ -1,0 +1,10 @@
+{
+  "maps": [
+    {
+      "id": "e0ecb3cf",
+      "name": "默认地图",
+      "created_at": "2026-09-01T13:18:26"
+    }
+  ],
+  "active": "e0ecb3cf"
+}

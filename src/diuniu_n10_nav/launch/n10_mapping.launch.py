@@ -93,9 +93,10 @@ def generate_launch_description():
     )
 
     # 5. 雷达自遮挡过滤器：/scan → /scan_filtered
-    #    参数与 diuniu_nav/launch/diuniu_nav.launch.py 保持一致（改动请两边同步）：
+    #    参数与 n10_nav_all.launch.py 保持一致（改动请两边同步）：
     #    x_min=-0.35 车身后界+5cm（货叉在车身范围内、车尾无伸出，勿退回 -1.65 幻影尾巴）；
-    #    x_max=1.65 / y=±0.36 车身轮廓+1cm（±0.40 会误删贴侧行人）
+    #    x_max=1.95 / y=±0.36（2026-09-01 由 1.65 前移 0.30m，与导航侧及 CM 多边形同步，
+    #    见 nav2_params.yaml collision_monitor 注释）
     #    ★ laser_x_offset=1.295：过滤器不走 TF，直接在扫描坐标系算 x_base=x_laser+offset
     #      （Mid360 链 /scan 已是 base_link 系故 offset=0；N10 的 /scan 是 n10_laser_link
     #       系，必须给雷达在 base_link 下的 x 偏移(原雷达位前方 8cm)，否则屏蔽盒错位滤不到车身）
@@ -106,7 +107,7 @@ def generate_launch_description():
         name='laserscan_filter',
         parameters=[{
             'x_min': -0.35,
-            'x_max': 1.65,
+            'x_max': 1.95,
             'y_min': -0.36,
             'y_max': 0.36,
             'laser_x_offset': 1.295,   # ★ N10 在 base_link 前方 1.295m（原雷达位前 8cm，与 URDF 同步）

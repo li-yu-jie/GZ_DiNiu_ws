@@ -76,7 +76,7 @@
   <joint name="imu_joint" type="fixed">
     <parent link="laser_link"/>
     <child link="imu_link"/>
-    <!-- IMU 位于 Livox 雷达壳体内部，直接绑定在 laser_link (160cm 倒装) -->
+    <!-- IMU 位于 Livox 雷达壳体内部，直接绑定在 laser_link（0.66m 正装，见 laser_joint） -->
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 

@@ -280,6 +280,15 @@ class DiuNiuTeleopSerial(Node):
         super().destroy_node()
 
 def main(args=None):
+    # rclpy 默认只处理 SIGINT；kill/launch 停机用的是 SIGTERM，
+    # 不处理会跳过 destroy_node 的零速帧，底盘保持最后速度。
+    # （SIGKILL 无法在进程内兜底，根治需 STM32 端通信看门狗）
+    import signal
+
+    def _sigterm_handler(*_):
+        raise KeyboardInterrupt()
+
+    signal.signal(signal.SIGTERM, _sigterm_handler)
     rclpy.init(args=args)
     node = DiuNiuTeleopSerial()
     try:

@@ -115,6 +115,8 @@ class DiuNiuBaseNode(Node):
         #    手柄活跃期间（0.5s 内）忽略 Nav2 的 /cmd_vel，防止两路指令 20~50Hz 交错争抢底盘。
         #    初始化为启动时刻，避免开机瞬间 Nav2 指令抢在手柄前生效。
         self.last_joy_cmd_time = self.get_clock().now()
+        # 二进制模式切换看门狗（connect_serial 设置期限，收到有效帧清除）
+        self._mode_switch_deadline = None
         self.cmd_send_timer = self.create_timer(0.05, self.cmd_send_timer_callback)
         
         self.get_logger().info("🚀 DiuNiu ROS 2 驱动节点已启动，正在监听底盘数据流...")
@@ -136,6 +138,9 @@ class DiuNiuBaseNode(Node):
                 self.serial_port.flush()
                 time.sleep(0.1)
                 self.serial_port.reset_input_buffer()
+                # 下位机可能未响应模式切换（无应答校验）：给读循环设一个期限，
+                # 超时仍无有效遥测帧则重发 mode 1（见 serial_read_loop）
+                self._mode_switch_deadline = time.monotonic() + 10.0
             except Exception as e:
                 self.get_logger().error(f"❌ 串口打开失败: {e}，将在后台自动尝试重连...")
                 self.serial_port = None
@@ -313,6 +318,14 @@ class DiuNiuBaseNode(Node):
                 time.sleep(1.0)
                 self.connect_serial()
                 continue
+
+            # 模式切换看门狗：连接后 10s 仍无有效遥测帧，
+            # 说明下位机可能没切到二进制模式（无应答校验），重发 mode 1
+            if (self._mode_switch_deadline is not None
+                    and time.monotonic() > self._mode_switch_deadline):
+                self.get_logger().warn("连接后无有效遥测帧，重发 mode 1 切换二进制模式")
+                self.send_cmd("mode 1\r\n")
+                self._mode_switch_deadline = time.monotonic() + 5.0
                 
             try:
                 waiting = ser_obj.in_waiting
@@ -342,14 +355,23 @@ class DiuNiuBaseNode(Node):
                         if calc_crc == recv_crc:
                             # 校验通过，解包
                             parsed = struct.unpack(packet_format, payload_data)
-                            
+
                             length = parsed[0]
+                            if length != 48:
+                                # Length 字段不符（协议固定 48）：CRC 碰巧通过的其他
+                                # 帧/控制回显，不能当遥测解析，否则数据错乱
+                                self.get_logger().warn(
+                                    f"Length 字段异常: {length}（期望 48），丢弃该帧",
+                                    throttle_duration_sec=5.0)
+                                del buffer[:52]
+                                continue
                             vx = parsed[1]
                             wz = parsed[2]
                             # 帧内 IMU1 槽位无真实数据(恒定单位四元数)，BNO085 实际挂在 IMU2 槽位
                             imu2_qw, imu2_qx, imu2_qy, imu2_qz = parsed[7:11]
 
                             self.publish_sensor_data(vx, wz, imu2_qw, imu2_qx, imu2_qy, imu2_qz)
+                            self._mode_switch_deadline = None   # 收到有效帧，模式切换确认成功
                             del buffer[:52]
                         else:
                             # 校验和错误，可能是文本段撞字符，丢弃头部并继续寻找
@@ -360,6 +382,12 @@ class DiuNiuBaseNode(Node):
             except Exception as e:
                 self.get_logger().error(f"串口读取/解析异常: {e}")
                 with self.serial_lock:
+                    # 只置 None 不 close 会泄漏底层 fd，重连时端口可能仍被占用
+                    try:
+                        if self.serial_port is not None:
+                            self.serial_port.close()
+                    except Exception:
+                        pass
                     self.serial_port = None
                 time.sleep(0.5)
 

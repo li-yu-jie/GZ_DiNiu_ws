@@ -18,7 +18,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -35,6 +35,8 @@ def generate_launch_description():
     with open(urdf_file, 'r') as infp:
         robot_desc = infp.read()
 
+    # LaunchConfiguration 使用前必须声明，否则直接运行本 launch 报"参数未声明"
+    use_sim_time_arg = DeclareLaunchArgument('use_sim_time', default_value='false')
     use_sim_time = LaunchConfiguration('use_sim_time')
 
     # 1. Mid360 雷达驱动
@@ -140,6 +142,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        use_sim_time_arg,
         livox_launch,
         fast_lio_launch,
         base_launch,

@@ -22,11 +22,14 @@ sync_one() {
     majmin=$(stat -c '%t %T' "$node")
     local maj min
     read maj min <<< "$majmin"
-    docker exec "$CONTAINER" bash -c "
+    # mknod 需要容器内 root（--user root 显式指定，不依赖容器默认用户）；
+    # 符号链接目标可能含子目录（如 bus/usb/...），先补父目录
+    docker exec --user root "$CONTAINER" bash -c "
+        mkdir -p /dev/$(dirname "$target")
         [ -e /dev/$target ] || mknod /dev/$target c $((16#$maj)) $((16#$min))
         chmod 666 /dev/$target
         ln -sfn $target /dev/$link
-    "
+    " || { echo "❌ 容器内创建 /dev/$target 失败（容器是否 --privileged？）"; return 1; }
     echo "✔ 容器内 /dev/$link -> $target (major=$((16#$maj)) minor=$((16#$min)))"
 }
 

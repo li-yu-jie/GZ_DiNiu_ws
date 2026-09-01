@@ -75,8 +75,11 @@ def to_px(x, y, origin, res, height):
     ROS map_server 的 pgm 原点在左下角，而图像行从上往下存储，
     因此行号必须做 H-1 翻转（漏翻转会把投影上下画反）。
     """
-    col = int((x - origin[0]) / res)
-    row = height - 1 - int((y - origin[1]) / res)
+    import math
+    # 用 floor 而非 int()：int() 向零截断，负世界坐标会差一格像素
+    # （map_server 的栅格划分等价于 floor）
+    col = math.floor((x - origin[0]) / res)
+    row = height - 1 - math.floor((y - origin[1]) / res)
     return col, row
 
 

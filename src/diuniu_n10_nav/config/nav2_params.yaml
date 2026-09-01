@@ -20,7 +20,7 @@
 #      局部 [+1.60/-0.30]×±0.35（整车物理轮廓=车身轮廓，含叉）；
 #      ⚠️ 货叉从车尾向前 1.20m 伸在车身范围内、车尾无伸出——勿再按"叉尖伸出
 #      车尾 -1.65"加幻影尾巴（8-28 上午的错），也别回到"叉在车头"的更早旧错
-#      laserscan_filter 屏蔽盒 [-0.35,1.65]×±0.36 为车身包络
+#      laserscan_filter 屏蔽盒 [-0.35,1.95]×±0.36 为车身包络（2026-09-01 由 1.65 前移 0.30m，见 collision_monitor 注释）
 #   3. 代价地图障碍源为 /scan_filtered（过滤车体自遮挡后的干净扫描）
 #   4. Tricycle 不能原地自转：use_rotate_to_heading=false；
 #      但允许倒车（allow_reversing=true + REEDS_SHEPP）：插货对位/近点修正刚需，
@@ -66,17 +66,18 @@ amcl:
     # ⚠️ 差速运动模型：Tricycle 无严格匹配的 AMCL 模型，用差速模型近似（转向角受限，够用）
     robot_model_type: nav2_amcl::DifferentialMotionModel
     save_pose_rate: 0.5
-    # ⚠️ 勿强制 set_initial_pose: true + 固定坐标！地图原点 [-29.4,-53]，固定初值
-    #    意味着"车永远从同一点位开机"，在别处开机会锁定错误位姿：map→odom 偏数米、
-    #    静态墙与现实错位，全局规划会规划穿真墙的路径。
-    #    正确流程：开机后先在 RViz 用 2D Pose Estimate 给粗位姿（或将下方坐标
-    #    改成当次实际停车位再启动）。
-    set_initial_pose: false
+    # ★ 开机自动给初始位姿 = 固定停车位（即 waypoints.json 的"初始位置"点，
+    #    与 diuniu_nav 地图同原点 [-4.79,-10.1]，坐标两栈通用）。
+    #    效果：启动即自动定位，无需 RViz 手动 2D Pose Estimate。
+    # ⚠️ 此值意味着"车从停车位开机"。在别处开机会先锁定错误位姿，
+    #    此时照旧在 RViz 用 2D Pose Estimate 纠正一次即可（AMCL 接受 /initialpose 覆盖），
+    #    长期更换停车位则更新下方坐标。
+    set_initial_pose: true
     initial_pose:
-      x: 0.0
-      y: 0.0
+      x: -1.1864
+      y: 0.1960
       z: 0.0
-      yaw: 0.0
+      yaw: 0.1920
     sigma_hit: 0.2                      # ★ 适度放宽至 0.2：兼顾匹配精度与粒子收敛速度，偏移后能更快找回正确位置
     update_min_d: 0.05                   # ★ 恢复 0.05m
     update_min_a: 0.10                   # ★ 2026-08-31 恢复 0.10rad(5.7度)：EKF已经修好了静止漂移，不需要再让 AMCL 如此高频地更新了
@@ -193,10 +194,11 @@ controller_server:
     general_goal_checker:
       stateful: true                    # ★ 保持 true：xy 一旦满足即锁存，只盯 yaw
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.18           # ★ 用户定制：18cm 位置精度
-      # ★ 2026-08-31 提至高精度：0.052rad (约 3.0°) 
+      xy_goal_tolerance: 0.20           # ★ 20cm 位置精度（与 diuniu_nav 主栈对齐）
+      # ★ 5.7° (0.1rad)：勿收紧！AMCL 例行位姿修正跳动 ≥3°，<3° 的窗口会在判定成功后
+      #    被跳变打破 → "到了又重规划"末端振荡（2026-09-02 由 0.052 对齐主栈）。
       #    插货高精度对位不归这里管——由 tag_align（相机）完成。
-      yaw_goal_tolerance: 0.052
+      yaw_goal_tolerance: 0.1
     # ========== RPP 纯追踪控制器（核心调参区） ==========
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
@@ -244,13 +246,13 @@ local_costmap:
       # ★ 未知=障碍（倒车安全前提之一）：未被雷达射线清扫过的区域按障碍处理，
       #    倒车只允许倒入"扫过且为空"的区域；正常"前进-倒车修正"场景后方区域
       #    几秒前刚被扫过（known-free），不受影响。
-      #    屏蔽盒已收紧为车身包络 [-0.35,1.65]（车尾无伸出），车尾障碍本层可见；
-      #    盒内 inf 射线清扫区（inf_is_valid=true）的动态障碍兜底靠 CM 原始 /scan 多边形
+      #    屏蔽盒为车身包络 [-0.35,1.95]（2026-09-01 前移 0.30m，见 CM 注释），车尾障碍本层可见；
+      #    盒内 inf 射线清扫区（inf_is_valid=true）的动态障碍兜底靠 CM 多边形（已同步外移）
       track_unknown_space: true
       width: 5
       height: 5
       resolution: 0.05                  # 5cm 栅格分辨率
-      robot_radius: 1.64  # 后备防撞圆半径（footprint 解析失败时的兜底）：局部 footprint 外接圆 √(1.60²+0.35²)≈1.64
+      # robot_radius 已删除（2026-09-02）：Nav2 中 footprint 优先，radius 并非解析失败兜底，留着只会误导
       # ★ 局部碰撞轮廓 = 整车物理轮廓（含叉）：车头 +1.60m / 车尾 -0.30m / 半宽 0.35m
       #    货叉从车尾向前 1.20m 伸在车身范围内、车尾无伸出（2026-08-28 用户实车确认），
       #    整车轮廓即车身轮廓；RPP 倒车碰撞检查依赖本轮廓，勿再加"叉尖幻影尾巴"
@@ -297,7 +299,7 @@ global_costmap:
       transform_tolerance: 0.5
       # ★ 未知=障碍：建图时没扫到的区域一律视为不可通行（配合 planner allow_unknown: false）
       track_unknown_space: true
-      robot_radius: 1.70   # 后备兜底：全局 footprint 外接圆 √(1.65²+0.40²)≈1.70
+      # robot_radius 已删除（2026-09-02）：同上，footprint 优先生效
       # ★ 全局规划轮廓 = 整车轮廓+5cm 余量：前 +1.65m / 后 -0.35m / 半宽 0.40m
       #    整车（含叉）物理范围 [-0.30,+1.60]×±0.35：货叉从车尾向前 1.20m 伸在车身范围内、
       #    车尾无伸出（2026-08-28 用户实车确认）；载货按车身长宽计（托盘规格不一，不留载货余量）
@@ -356,7 +358,7 @@ planner_server:
       downsampling_factor: 2           # ★ 降采样因子设为 2（从 5cm 降为 10cm 规划网格，大幅提升狭窄通道规划连通性，防止误判堵塞）
       # ★ tolerance 必须 ≤ goal_checker 的 xy_goal_tolerance(0.20)！否则目标落膨胀区时
       #    规划器"妥协成功"（路径只修到 0.5m 内），而到点判定永远不满足 → 近点绕圈+无限重规划
-      tolerance: 0.18                   # ★ 2026-08-31 用户定制：18cm = 0.18m（与 goal_checker 对齐）
+      tolerance: 0.20                   # ★ 与 goal_checker 的 xy_goal_tolerance(0.20) 对齐（2026-09-02 由 0.18 同步主栈）
       allow_unknown: false            # ★ 未知=障碍：建图未覆盖区域禁止规划穿越（倒车安全的另一半）
       max_iterations: 2000000          # 路径搜索最大迭代次数上限 (200万次，保证复杂长路径搜索不中断)
       max_on_approach_iterations: 10000 # 接近目标点时的逼近迭代上限
@@ -373,7 +375,7 @@ planner_server:
                                        #    纯倒车路径无换向不受影响，开放倒车后此值仍有效
       non_straight_penalty: 2.2        # ★ 提高至 2.2：重罚转向段，规划器偏好"先摆正车身再直穿门/直行道"，杜绝斜角进门导致叉尖扫门框的几何死局
       cost_penalty: 1.2                # ★ 降低至 1.2：大幅降低代价权重，使规划器优先选择直线/几何最短距离，杜绝因为代价噪点产生的细微蛇形绕行
-      use_final_approach_orientation: true # ★ 恢复为 true：让全局规划器（倒车/前进）自动规划出完美对齐目标角度的泊车路径，代替底层的强行自转（甩尾大圈）
+      use_final_approach_orientation: false # ★ 关键参数：末端路径不强行甩尾匹配目标角度（2026-09-02 由 true 对齐主栈）
       minimum_turning_radius: 0.40       # ★ 设为 0.40m（虽然前轮可以打 90 度，但 Hybrid-A* 的离散网格搜索要求此半径不得小于其降采样后的像素尺寸 0.10m，0.40m 约占 4 个像素，保证生成曲线不崩溃）
       lookup_table_size: 20.0          # 启发式查找表大小 (20m)
       cache_obstacle_heuristic: false  # 是否缓存障碍物启发式地图
@@ -432,14 +434,17 @@ collision_monitor:
     polygons: ["FrontStop", "BodyStop", "SideStop", "FrontSlowdown", "CircleSlowdown", "RearSlowdown", "RearStop"]
     FrontStop:
       type: "polygon"
-      # 车头保险杠(1.60m)前方 5~25cm 硬停条带；起点 1.65 避开 1.60m 车头与桅杆微晃误差
+      # 车头保险杠(1.60m)前方 35~55cm 硬停条带（2026-09-01 patch_cm.py 由 1.65~1.85 前移 0.30m：
+      # CM 数据源改 /scan_filtered 后，过滤盒 [-0.35,1.95]×±0.36 内的点不可得，多边形同步外移）
       points: [1.95, -0.34, 1.95, 0.34, 2.15, 0.34, 2.15, -0.34]
       action_type: "stop"
       max_points: 3
       visualize: true
     BodyStop:
       type: "polygon"
-      # 全车身安全气囊（前1.65/后-0.38/左右±0.43）：为自转扫墙和侧向刮擦提供硬急停
+      # 全车身安全气囊（前1.95/后-0.38/左右±0.43）：为自转扫墙和侧向刮擦提供硬急停
+      # 前界 2026-09-01 由 1.65 前移 0.30m（同 FrontStop 原因）；过滤盒内近场点不可得，
+      # 侧向 |y|∈[0.36,0.43] 条带与 x>1.95 前向区仍有效
       points: [1.95, -0.43, 1.95, 0.43, -0.38, 0.43, -0.38, -0.43]
       action_type: "stop"
       max_points: 3
@@ -447,7 +452,8 @@ collision_monitor:
     SideStop:
       type: "polygon"
       # ★ 新增侧向急停区：覆盖车身左右两侧（y=±0.43~±0.75）自转时扫掠到的人员
-      # 长度与车身一致（前 1.60m / 后 -0.30m），宽度延伸至车侧 0.75m
+      # 长度前界 1.90（2026-09-01 由 1.60 前移 0.30m，同 FrontStop 原因）/ 后 -0.30m，
+      # 宽度延伸至车侧 0.75m
       points: [1.90, 0.43, 1.90, 0.75, -0.30, 0.75, -0.30, 0.43,
                -0.30, -0.43, -0.30, -0.75, 1.90, -0.75, 1.90, -0.43]
       action_type: "stop"
@@ -455,7 +461,8 @@ collision_monitor:
       visualize: true
     FrontSlowdown:
       type: "polygon"
-      # 车头前方 2~80cm 减速区：提前把速度压到 30%，给 RPP 与制动留出时间
+      # 车头前方 32~110cm 减速区（2026-09-01 由 1.62~2.40 前移 0.30m，同 FrontStop 原因）：
+      # 提前把速度压到 30%，给 RPP 与制动留出时间
       points: [1.92, -0.34, 1.92, 0.34, 2.70, 0.34, 2.70, -0.34]
       action_type: "slowdown"
       max_points: 3
@@ -492,4 +499,5 @@ collision_monitor:
     observation_sources: ["scan"]
     scan:
       type: "scan"
-      topic: "/scan_filtered"                     # ★ 原始扫描（含被过滤盒删除的近场点），勿改为 /scan_filtered
+      topic: "/scan_filtered"                     # ★ 2026-09-01 patch_cm.py：CM 改用过滤后扫描（与代价地图同源），
+                                                  # 前向多边形同步前移 0.30m 越过过滤盒；旧配置为原始 /scan + 多边形不前移（见 git）
