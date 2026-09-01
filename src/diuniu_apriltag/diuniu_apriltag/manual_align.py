@@ -11,7 +11,7 @@ from rcl_interfaces.msg import Parameter, ParameterType
 
 # 等待视觉对齐完成的最长时间 (s)：tag_align 丢码/相机故障时不会发 done，
 # 无超时此处会永久挂起
-ALIGN_TIMEOUT = 120.0
+ALIGN_TIMEOUT = 360.0
 
 
 class ManualAlignTrigger(Node):
