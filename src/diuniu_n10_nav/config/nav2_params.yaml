@@ -374,7 +374,7 @@ planner_server:
       non_straight_penalty: 2.2        # ★ 提高至 2.2：重罚转向段，规划器偏好"先摆正车身再直穿门/直行道"，杜绝斜角进门导致叉尖扫门框的几何死局
       cost_penalty: 1.2                # ★ 降低至 1.2：大幅降低代价权重，使规划器优先选择直线/几何最短距离，杜绝因为代价噪点产生的细微蛇形绕行
       use_final_approach_orientation: true # ★ 恢复为 true：让全局规划器（倒车/前进）自动规划出完美对齐目标角度的泊车路径，代替底层的强行自转（甩尾大圈）
-      minimum_turning_radius: 0.05       # ★ 设为 0.05m（趋近于0）！前轮可以打 90 度，这台地牛具备原地（以后轴中心）极小半径转弯的超强机动性！
+      minimum_turning_radius: 0.40       # ★ 设为 0.40m（虽然前轮可以打 90 度，但 Hybrid-A* 的离散网格搜索要求此半径不得小于其降采样后的像素尺寸 0.10m，0.40m 约占 4 个像素，保证生成曲线不崩溃）
       lookup_table_size: 20.0          # 启发式查找表大小 (20m)
       cache_obstacle_heuristic: false  # 是否缓存障碍物启发式地图
       debug_visualizations: false     # 关闭调试点云发布以节省 CPU

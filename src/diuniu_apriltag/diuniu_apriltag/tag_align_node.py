@@ -507,9 +507,21 @@ class TagAlignNode(Node):
                         f'🚗→🌀 距离就位（z={tr.z:.2f}m），左右对齐良好 (x={tr.x*100:+.1f}cm)，原地精调偏航')
                     return
             if err_z < 0.0:
-                self.state = 'overshoot'
-                self.pub.publish(cmd)   # 立即停车；报警文案统一在 overshoot 分支
-                return
+                if self.forward_retry_count < self.max_forward_retries:
+                    self.forward_retry_count += 1
+                    self.state = 'forward_adjust'
+                    self.start_forward_z = tr.z
+                    # 过冲说明需要更大的调整空间，直接使用设定的前拉距离
+                    self.forward_target_dist = self.forward_adjust_dist
+                    self.pub.publish(Twist())  # 先停车
+                    self.get_logger().warn(
+                        f'⚠️ 过冲 (z={tr.z:.2f}m < 目标 {self.target_z:.2f}m)！'
+                        f'启动第 {self.forward_retry_count}/{self.max_forward_retries} 次前行调整...')
+                    return
+                else:
+                    self.state = 'overshoot'
+                    self.pub.publish(cmd)   # 立即停车；报警文案统一在 overshoot 分支
+                    return
             v_mag = min(self.reverse_speed,
                         max(self.min_creep, self.k_v * err_z))
             # 横向偏差减速机制：左右横向偏差越大，越慢速倒车，给打舵对中留出足够反应时间和转弯位移空间。
