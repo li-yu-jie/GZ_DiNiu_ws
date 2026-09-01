@@ -202,7 +202,7 @@ controller_server:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
       desired_linear_vel: 0.6           # ★ 与 velocity_smoother max_velocity.x 严格对齐
       lookahead_dist: 1.5
-      min_lookahead_dist: 1.3          # ★ 提至 1.3m = 物理轴距！
+      min_lookahead_dist: 0.50         # ★ 降至 0.50m：由于前轮能打 90 度，调小前瞻距离以允许贴紧 90 度直角弯，不再为了防扭而超大前瞻切角
       max_lookahead_dist: 1.8          # ★ 上限 1.8m
       lookahead_time: 2.5
       use_velocity_scaled_lookahead_dist: true
@@ -374,7 +374,7 @@ planner_server:
       non_straight_penalty: 2.2        # ★ 提高至 2.2：重罚转向段，规划器偏好"先摆正车身再直穿门/直行道"，杜绝斜角进门导致叉尖扫门框的几何死局
       cost_penalty: 1.2                # ★ 降低至 1.2：大幅降低代价权重，使规划器优先选择直线/几何最短距离，杜绝因为代价噪点产生的细微蛇形绕行
       use_final_approach_orientation: true # ★ 恢复为 true：让全局规划器（倒车/前进）自动规划出完美对齐目标角度的泊车路径，代替底层的强行自转（甩尾大圈）
-      minimum_turning_radius: 1.30       # ★ 设为 1.30m！匹配地牛 AGV 1.3m 物理轴距与 75° 最大打角物理转弯半径，禁止规划器出 0.35m 无法物理执行的折线！
+      minimum_turning_radius: 0.05       # ★ 设为 0.05m（趋近于0）！前轮可以打 90 度，这台地牛具备原地（以后轴中心）极小半径转弯的超强机动性！
       lookup_table_size: 20.0          # 启发式查找表大小 (20m)
       cache_obstacle_heuristic: false  # 是否缓存障碍物启发式地图
       debug_visualizations: false     # 关闭调试点云发布以节省 CPU
