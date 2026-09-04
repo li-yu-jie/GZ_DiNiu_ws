@@ -58,7 +58,7 @@ AprilTag 倒车对中节点（tag_align）
   - ALIGN3 只对 ≤stale_w_window 内的新检测发自转 w，其余周期发零速等新帧
   - 参数校验：steer_sign/yaw_sign 只接受 ±1，增益/速度/阈值拒绝非法值
     （param set 误输不会变成危险指令）
-  - enabled=false → 持续发零速（暂停），可 ros2 param set /tag_align enabled 热切换
+  - enabled=false → 补 0.5s 零速后静默（暂停），可 ros2 param set /tag_align enabled 热切换
   - 底盘 0.2s 看门狗兜底：本节点崩了车也会自停
   - 手柄 /cmd_vel_joy 优先：底盘仲裁手柄活跃期忽略本节点指令，
     松开手柄 0.5s 后本节点自动恢复倒车（注意！）
@@ -207,6 +207,9 @@ class TagAlignNode(Node):
         self.tf_listener = tf2_ros.TransformListener(self.tf_buf, self)
         self.pub = self.create_publisher(Twist, gp('cmd_vel_topic').value, 10)
         self.done_pub = self.create_publisher(Bool, 'tag_align_done', 10)
+        # 暂停后补发零速的剩余周期数：enabled=false 时先补 10 个周期（20Hz≈0.5s）
+        # 把可能残留的运动刹停，然后彻底静默——见 control_loop 注释
+        self._disabled_zero_cycles = 10
         self.timer = self.create_timer(
             1.0 / gp('control_rate').value, self.control_loop)
 
@@ -285,9 +288,22 @@ class TagAlignNode(Node):
 
     def control_loop(self):
         if not self.get_parameter('enabled').value:
-            self.stop('enabled=false（已暂停，param set 可恢复）')
+            # ★暂停≠永远发零速：FMS 架构下本节点与 Nav2 常驻共存、共用 /cmd_vel，
+            #   持续 20Hz 零速会覆盖 Nav2 的速度指令（last-writer-wins），
+            #   导致 Nav2 导航时车一动不动（2026-09-02 实车根因）。
+            #   改为：暂停后只补 10 个周期零速刹停残余运动，随后彻底静默——
+            #   底盘看门狗 0.2s 无帧自停，静默同样安全。
+            if self._disabled_zero_cycles > 0:
+                self._disabled_zero_cycles -= 1
+                self.stop('enabled=false（已暂停，param set 可恢复）')
+            else:
+                self.get_logger().warn(
+                    '🛑 已暂停（保持静默，不占用 /cmd_vel；param set enabled 可恢复）',
+                    throttle_duration_sec=5.0)
             return
-            
+        # 唤醒后重置补发计数，下次暂停时重新补一段零速
+        self._disabled_zero_cycles = 10
+
         if self.state != 'done':
             msg = Bool()
             msg.data = False

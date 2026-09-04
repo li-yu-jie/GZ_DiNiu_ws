@@ -43,6 +43,22 @@ class DiuNiuFMSNode(Node):
         self.nav_timeout = self.get_parameter('nav_timeout').value
         self.nav2_active_timeout = self.get_parameter('nav2_active_timeout').value
 
+        # —— 动作时序参数（2026-09-02 用户实车定案，均支持 ros2 param set 热调）——
+        # 任务时序：升叉 → 导航到取货点 → 视觉矫正 → 降叉 → 后退插取 → 升叉(抬货)
+        #          → 导航到卸货点 → 视觉矫正 → 后退送货 → 降叉(放货) → 前进退出 → 回停车点
+        self.declare_parameter('fork_up_time', 4.0)          # 升叉时长 (s)
+        self.declare_parameter('fork_down_time', 6.0)        # 降叉时长 (s)
+        self.declare_parameter('insert_reverse_dist', 1.0)   # 后退插取/送货距离 (m)，现场标定
+        self.declare_parameter('insert_reverse_speed', 0.15) # 后退速度 (m/s)，进出货架宜慢
+        self.declare_parameter('forward_clear_dist', 1.2)    # 卸货后前进退出距离 (m)
+        self.declare_parameter('forward_clear_speed', 0.2)   # 前进退出速度 (m/s)
+        self.fork_up_time = self.get_parameter('fork_up_time').value
+        self.fork_down_time = self.get_parameter('fork_down_time').value
+        self.insert_reverse_dist = self.get_parameter('insert_reverse_dist').value
+        self.insert_reverse_speed = self.get_parameter('insert_reverse_speed').value
+        self.forward_clear_dist = self.get_parameter('forward_clear_dist').value
+        self.forward_clear_speed = self.get_parameter('forward_clear_speed').value
+
         # 注意：不在构造函数里 waitUntilNav2Active()（会把节点挂死），
         # 改为任务真正开始时带超时等待，见 nav_to_station()
         self.navigator = BasicNavigator()
@@ -170,8 +186,8 @@ class DiuNiuFMSNode(Node):
                 self.current_dropoff = (dx, dy, math.degrees(dyaw))
 
                 self.abort_requested = False
-                self.state = 'NAV_TO_PICKUP'
-                self.get_logger().info(f"✅ 收到新任务！取货坐标: {self.current_pickup}, 卸货坐标: {self.current_dropoff}")
+                self.state = 'FORK_UP_TRANSIT'
+                self.get_logger().info(f"✅ 收到新任务！取货坐标: {self.current_pickup}, 卸货坐标: {self.current_dropoff}（先升叉再导航）")
                 return
 
             # Legacy parsing
@@ -185,8 +201,8 @@ class DiuNiuFMSNode(Node):
             self.current_pickup = pickup
             self.current_dropoff = dropoff
             self.abort_requested = False
-            self.state = 'NAV_TO_PICKUP'
-            self.get_logger().info(f"✅ 收到新任务！取货点: {pickup}, 卸货点: {dropoff}")
+            self.state = 'FORK_UP_TRANSIT'
+            self.get_logger().info(f"✅ 收到新任务！取货点: {pickup}, 卸货点: {dropoff}（先升叉再导航）")
         except Exception as e:
             self.get_logger().error(f"解析任务失败: {text}, 错误: {e}")
 
@@ -284,15 +300,17 @@ class DiuNiuFMSNode(Node):
                 if succeeded:
                     self.get_logger().warn('视觉对齐已完成，但停用 tag_align 失败')
 
-    def control_fork(self, up=True):
-        self.get_logger().info(f"执行货叉动作: {'上升 (插取)' if up else '下降 (卸货)'}")
+    def control_fork(self, up=True, duration=None):
+        """升/降货叉，持续 duration 秒（默认按 up/down 取各自参数）。"""
+        if duration is None:
+            duration = self.fork_up_time if up else self.fork_down_time
+        self.get_logger().info(f"执行货叉动作: {'上升' if up else '下降'} {duration:.1f}s")
         twist = Twist()
         twist.linear.z = 1.0 if up else -1.0
 
         try:
-            # 持续发送 3 秒钟
             start_time = time.time()
-            while time.time() - start_time < 3.0 and rclpy.ok():
+            while time.time() - start_time < duration and rclpy.ok():
                 if self.abort_requested or self._stop_event.is_set():
                     self.get_logger().warn('货叉动作被中止')
                     return False
@@ -304,25 +322,36 @@ class DiuNiuFMSNode(Node):
             # 停止货叉（退出时必补零速帧）
             self.publish_stop()
 
-    def move_forward_clear(self):
-        self.get_logger().info("底盘直行 1m 退空...")
+    def move_timed(self, linear_x, duration, label):
+        """以固定速度直行 duration 秒（盲走，无反馈；负值=倒车）。"""
+        self.get_logger().info(f"{label}: v={linear_x:+.2f} m/s × {duration:.1f}s ...")
         twist = Twist()
-        twist.linear.x = 0.2  # 0.2 m/s
+        twist.linear.x = linear_x
 
         try:
-            # 持续发送 5 秒钟 (0.2 * 5 = 1.0m)
             start_time = time.time()
-            while time.time() - start_time < 5.0 and rclpy.ok():
+            while time.time() - start_time < duration and rclpy.ok():
                 if self.abort_requested or self._stop_event.is_set():
-                    self.get_logger().warn('退空动作被中止')
+                    self.get_logger().warn(f'{label}被中止')
                     return False
                 self.cmd_vel_pub.publish(twist)
                 time.sleep(0.1)
-            self.get_logger().info("退空完成")
+            self.get_logger().info(f"{label}完成")
             return True
         finally:
             # 停车（退出时必补零速帧）
             self.publish_stop()
+
+    def reverse_insert(self, label):
+        """后退插取/送货：按参数化距离和速度倒车。"""
+        duration = self.insert_reverse_dist / max(self.insert_reverse_speed, 0.01)
+        return self.move_timed(-abs(self.insert_reverse_speed), duration, label)
+
+    def forward_clear(self):
+        """卸货后前进退出货架。"""
+        duration = self.forward_clear_dist / max(self.forward_clear_speed, 0.01)
+        return self.move_timed(abs(self.forward_clear_speed), duration,
+                               f'底盘前进 {self.forward_clear_dist:.1f}m 退出')
 
     def _worker_loop(self):
         """任务状态机主循环（工作线程，回调上下文之外，允许服务调用轮询等待）。"""
@@ -340,7 +369,16 @@ class DiuNiuFMSNode(Node):
                 self._fail_task(f'状态机异常: {e}')
 
     def fms_step(self):
-        if self.state == 'NAV_TO_PICKUP':
+        # 任务时序（2026-09-02 用户实车定案，修正旧版"升叉→前进"方向颠倒问题）：
+        #   升叉 → 导航取货点 → 视觉矫正 → 降叉 → 后退插取 → 升叉(抬货)
+        #   → 导航卸货点 → 视觉矫正 → 后退送货 → 降叉(放货) → 前进退出 → 回停车点
+        if self.state == 'FORK_UP_TRANSIT':
+            if self.control_fork(up=True):
+                self.state = 'NAV_TO_PICKUP'
+            else:
+                self._fail_task('发车前升叉失败')
+
+        elif self.state == 'NAV_TO_PICKUP':
             if self.nav_to_station(self.current_pickup):
                 self.state = 'VISION_ALIGN_PICKUP'
             else:
@@ -348,21 +386,27 @@ class DiuNiuFMSNode(Node):
 
         elif self.state == 'VISION_ALIGN_PICKUP':
             if self.do_visual_align():
-                self.state = 'HARDWARE_PICKUP'
+                self.state = 'FORK_DOWN_PRE_INSERT'
             else:
                 self._fail_task('取货点视觉对齐失败')
 
-        elif self.state == 'HARDWARE_PICKUP':
-            if self.control_fork(up=True):
-                self.state = 'FORWARD_CLEAR'
+        elif self.state == 'FORK_DOWN_PRE_INSERT':
+            if self.control_fork(up=False):
+                self.state = 'REVERSE_INSERT'
             else:
-                self._fail_task('货叉取货动作失败')
+                self._fail_task('插取前降叉失败')
 
-        elif self.state == 'FORWARD_CLEAR':
-            if self.move_forward_clear():
+        elif self.state == 'REVERSE_INSERT':
+            if self.reverse_insert('后退插取货物'):
+                self.state = 'FORK_UP_LOAD'
+            else:
+                self._fail_task('后退插取失败')
+
+        elif self.state == 'FORK_UP_LOAD':
+            if self.control_fork(up=True):
                 self.state = 'NAV_TO_DROPOFF'
             else:
-                self._fail_task('取货后退空动作失败')
+                self._fail_task('抬货升叉失败')
 
         elif self.state == 'NAV_TO_DROPOFF':
             if self.nav_to_station(self.current_dropoff):
@@ -372,21 +416,27 @@ class DiuNiuFMSNode(Node):
 
         elif self.state == 'VISION_ALIGN_DROPOFF':
             if self.do_visual_align():
-                self.state = 'HARDWARE_DROPOFF'
+                self.state = 'REVERSE_PLACE'
             else:
                 self._fail_task('卸货点视觉对齐失败')
 
-        elif self.state == 'HARDWARE_DROPOFF':
-            if self.control_fork(up=False):
-                self.state = 'FORWARD_CLEAR_2'
+        elif self.state == 'REVERSE_PLACE':
+            if self.reverse_insert('后退送卸货物'):
+                self.state = 'FORK_DOWN_UNLOAD'
             else:
-                self._fail_task('货叉卸货动作失败')
+                self._fail_task('后退送货失败')
 
-        elif self.state == 'FORWARD_CLEAR_2':
-            if self.move_forward_clear():
+        elif self.state == 'FORK_DOWN_UNLOAD':
+            if self.control_fork(up=False):
+                self.state = 'FORWARD_CLEAR'
+            else:
+                self._fail_task('卸货降叉失败')
+
+        elif self.state == 'FORWARD_CLEAR':
+            if self.forward_clear():
                 self.state = 'NAV_TO_HOME'
             else:
-                self._fail_task('卸货后退空动作失败')
+                self._fail_task('卸货后前进退出失败')
 
         elif self.state == 'NAV_TO_HOME':
             if self.nav_to_station('HOME'):
